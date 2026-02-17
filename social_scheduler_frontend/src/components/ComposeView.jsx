@@ -81,21 +81,6 @@ const ComposeView = ({
     };
 
 
-    // Post Now Logic
-    const [postImmediately, setPostImmediately] = useState(false);
-
-    useEffect(() => {
-        if (postImmediately) {
-            // Set to 2 minutes from now to satisfy "future" validation safely
-            const now = new Date();
-            now.setMinutes(now.getMinutes() + 2);
-            now.setSeconds(0, 0);
-            // Format for datetime-local: YYYY-MM-DDTHH:mm
-            const formatted = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
-            setNewPost(prev => ({ ...prev, scheduled_at: formatted }));
-        }
-    }, [postImmediately, setNewPost]);
-
     return (
         <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border border-white/50 dark:border-white/5 shadow-xl shadow-slate-200/50 dark:shadow-black/50 rounded-2xl overflow-hidden transition-colors relative">
 

@@ -22,6 +22,7 @@ function App() {
   const [currentView, setCurrentView] = useState('compose');
   const [darkMode, setDarkMode] = useState(true);
   const [syncAll, setSyncAll] = useState(true);
+  const [postImmediately, setPostImmediately] = useState(false); // Lifted state
   const [searchQuery, setSearchQuery] = useState('');
   const prevPostsRef = useRef([]);
 
@@ -86,7 +87,18 @@ function App() {
     e.preventDefault();
     setLoading(true);
     try {
-      const isoDate = new Date(newPost.scheduled_at).toISOString();
+      // Calculate Scheduled Time
+      let isoDate;
+      if (postImmediately) {
+        // Set to 2 minutes from now to satisfy "future" validation safely
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + 2);
+        now.setSeconds(0, 0);
+        isoDate = now.toISOString();
+      } else {
+        isoDate = new Date(newPost.scheduled_at).toISOString();
+      }
+
       // Map selected platforms to payload
       const payload = newPost.platforms.map(platformId => ({
         content: newPost.content,
@@ -99,8 +111,9 @@ function App() {
       await createPost(payload);
 
       setNewPost({ content: '', platforms: ['linkedin'], scheduled_at: '', media_url: '' });
+      setPostImmediately(false); // Reset toggle
       fetchPosts();
-      toast.success('Posts scheduled successfully!', {
+      toast.success(postImmediately ? 'Posted successfully!' : 'Posts scheduled successfully!', {
         style: {
           background: '#333',
           color: '#fff',
@@ -240,6 +253,8 @@ function App() {
                   currentPlatform={currentPlatform}
                   syncAll={syncAll}
                   setSyncAll={setSyncAll}
+                  postImmediately={postImmediately}
+                  setPostImmediately={setPostImmediately}
                 />
               </div>
               <div className="lg:col-span-4">
