@@ -1,7 +1,8 @@
 import axios from 'axios';
 
+// Use environment variable or relative path for production
 const api = axios.create({
-    baseURL: 'http://localhost:8000',
+    baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
 export const getPosts = async () => {
