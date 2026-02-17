@@ -90,10 +90,9 @@ function App() {
       // Calculate Scheduled Time
       let isoDate;
       if (postImmediately) {
-        // Set to 2 minutes from now to satisfy "future" validation safely
+        // Set to 10 seconds from now for immediate effect (with slight buffer for latency)
         const now = new Date();
-        now.setMinutes(now.getMinutes() + 2);
-        now.setSeconds(0, 0);
+        now.setSeconds(now.getSeconds() + 10);
         isoDate = now.toISOString();
       } else {
         isoDate = new Date(newPost.scheduled_at).toISOString();

@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
     # Startup: Start Scheduler
     scheduler.add_job(
         check_scheduled_posts,
-        IntervalTrigger(seconds=60),
+        IntervalTrigger(seconds=10),
         id="check_posts",
         replace_existing=True,
     )
