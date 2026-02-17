@@ -154,7 +154,28 @@ async def delete_post(post_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
     return {"message": "Post deleted successfully"}
 
-@app.get("/")
-async def root():
+@app.get("/api/health")
+async def health_check():
     return {"message": "Social Media Scheduler API is running"}
+
+# Mount assets (JS/CSS built by Vite)
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
+# Ensure static/assets exists before mounting to avoid errors during dev if not built
+if os.path.exists("static/assets"):
+    app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
+
+# Catch-all for SPA (Serve index.html)
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    # Allow API routes to pass through (in case some are not caught above)
+    if full_path.startswith("api") or full_path.startswith("posts"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+        
+    # Serve index.html if exists
+    if os.path.exists("static/index.html"):
+        return FileResponse("static/index.html")
+    return {"message": "Frontend not found. Please build the frontend."}
 
