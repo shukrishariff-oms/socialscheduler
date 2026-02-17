@@ -14,8 +14,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from database import engine, Base, get_db, AsyncSessionLocal
-from models import SocialPost, PostStatus
-from schemas import PostCreate, PostResponse
+from models import SocialPost, PostStatus, ConnectedAccount
+from schemas import (
+    PostCreate, 
+    PostResponse,
+    ConnectAccountRequest,
+    ConnectAccountResponse,
+    AccountsStatusResponse,
+    AccountStatus,
+    DisconnectAccountResponse
+)
 from integration_service import send_to_social
 
 # --- Background Task: Check & Publish Posts ---
@@ -115,7 +123,7 @@ from threads_automation import ThreadsAutomation
 
 @app.post("/api/accounts/connect/threads")
 async def connect_threads_account(
-    request: schemas.ConnectAccountRequest,
+    request: ConnectAccountRequest,
     db: AsyncSession = Depends(get_db)
 ):
     """Test login and save Threads credentials"""
@@ -125,7 +133,7 @@ async def connect_threads_account(
         success = await automation.test_login(request.username, request.password)
         
         if not success:
-            return schemas.ConnectAccountResponse(
+            return ConnectAccountResponse(
                 success=False,
                 error="Invalid credentials or login failed. Please check your username and password."
             )
@@ -150,7 +158,7 @@ async def connect_threads_account(
             existing.connected_at = datetime.utcnow()
         else:
             # Create new
-            new_account = models.ConnectedAccount(
+            new_account = ConnectedAccount(
                 platform='threads',
                 username=request.username,
                 encrypted_password=encrypted_pw
@@ -159,7 +167,7 @@ async def connect_threads_account(
         
         await db.commit()
         
-        return schemas.ConnectAccountResponse(
+        return ConnectAccountResponse(
             success=True,
             username=request.username
         )
@@ -168,7 +176,7 @@ async def connect_threads_account(
         print(f"[CONNECT] Error: {e}")
         import traceback
         traceback.print_exc()
-        return schemas.ConnectAccountResponse(
+        return ConnectAccountResponse(
             success=False,
             error=f"Connection error: {str(e)}"
         )
@@ -178,15 +186,15 @@ async def get_accounts_status(db: AsyncSession = Depends(get_db)):
     """Get connection status for all platforms"""
     try:
         result = await db.execute(
-            select(models.ConnectedAccount).where(
-                models.ConnectedAccount.is_active == True
+            select(ConnectedAccount).where(
+                ConnectedAccount.is_active == True
             )
         )
         accounts = result.scalars().all()
         
-        return schemas.AccountsStatusResponse(
+        return AccountsStatusResponse(
             accounts=[
-                schemas.AccountStatus(
+                AccountStatus(
                     platform=acc.platform,
                     username=acc.username,
                     connected_at=acc.connected_at.isoformat(),
@@ -197,7 +205,7 @@ async def get_accounts_status(db: AsyncSession = Depends(get_db)):
         )
     except Exception as e:
         print(f"[STATUS] Error: {e}")
-        return schemas.AccountsStatusResponse(accounts=[])
+        return AccountsStatusResponse(accounts=[])
 
 @app.delete("/api/accounts/disconnect/{platform}")
 async def disconnect_account(
@@ -207,9 +215,9 @@ async def disconnect_account(
     """Disconnect a platform account"""
     try:
         result = await db.execute(
-            select(models.ConnectedAccount).where(
-                models.ConnectedAccount.platform == platform,
-                models.ConnectedAccount.is_active == True
+            select(ConnectedAccount).where(
+                ConnectedAccount.platform == platform,
+                ConnectedAccount.is_active == True
             )
         )
         account = result.scalar_one_or_none()
@@ -217,15 +225,15 @@ async def disconnect_account(
         if account:
             account.is_active = False
             await db.commit()
-            return schemas.DisconnectAccountResponse(success=True)
+            return DisconnectAccountResponse(success=True)
         
-        return schemas.DisconnectAccountResponse(
+        return DisconnectAccountResponse(
             success=False,
             error="Account not found"
         )
     except Exception as e:
         print(f"[DISCONNECT] Error: {e}")
-        return schemas.DisconnectAccountResponse(
+        return DisconnectAccountResponse(
             success=False,
             error=str(e)
         )
