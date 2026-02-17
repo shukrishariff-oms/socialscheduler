@@ -87,8 +87,6 @@ function App() {
     setLoading(true);
     try {
       const isoDate = new Date(newPost.scheduled_at).toISOString();
-      let payload = [];
-
       // Map selected platforms to payload
       const payload = newPost.platforms.map(platformId => ({
         content: newPost.content,
