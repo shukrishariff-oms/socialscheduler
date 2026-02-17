@@ -60,6 +60,13 @@ async def lifespan(app: FastAPI):
     # Startup: Create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+    # debug: Check Env Vars on Startup
+    import os
+    print("--- STARTUP CONFIG CHECK ---")
+    print(f"[DEBUG] THREADS_USER_ID Present: {bool(os.getenv('THREADS_USER_ID'))}")
+    print(f"[DEBUG] THREADS_ACCESS_TOKEN Present: {bool(os.getenv('THREADS_ACCESS_TOKEN'))}")
+    print("--- END CHECK ---")
     
     # Startup: Start Scheduler
     scheduler.add_job(
