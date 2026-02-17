@@ -63,9 +63,33 @@ async def lifespan(app: FastAPI):
         
     # debug: Check Env Vars on Startup
     import os
+    import httpx
     print("--- STARTUP CONFIG CHECK ---")
     print(f"[DEBUG] THREADS_USER_ID Present: {bool(os.getenv('THREADS_USER_ID'))}")
     print(f"[DEBUG] THREADS_ACCESS_TOKEN Present: {bool(os.getenv('THREADS_ACCESS_TOKEN'))}")
+    
+    # Test Threads Token Validity
+    token = os.getenv('THREADS_ACCESS_TOKEN') or os.getenv('THREADS_TOKEN')
+    if token:
+        print("[STARTUP] Testing Threads API token...")
+        try:
+            async with httpx.AsyncClient() as client:
+                test_resp = await client.get(
+                    "https://graph.threads.net/v1.0/me",
+                    params={'fields': 'id,username', 'access_token': token},
+                    timeout=10.0
+                )
+                if test_resp.status_code == 200:
+                    data = test_resp.json()
+                    print(f"[STARTUP] ✓ Threads token VALID - User: @{data.get('username')} (ID: {data.get('id')})")
+                else:
+                    print(f"[STARTUP] ✗ Threads token INVALID - Status: {test_resp.status_code}")
+                    print(f"[STARTUP] Error: {test_resp.text}")
+        except Exception as e:
+            print(f"[STARTUP] ✗ Threads API test failed: {e}")
+    else:
+        print("[STARTUP] ⚠ No Threads token found - Threads posting will fail")
+    
     print("--- END CHECK ---")
     
     # Startup: Start Scheduler
