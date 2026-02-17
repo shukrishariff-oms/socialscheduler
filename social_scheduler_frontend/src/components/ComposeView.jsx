@@ -3,6 +3,7 @@ import { Send, ImageIcon, Clock, Sparkles, Wand2, Split, Trophy, Copy, Check, X,
 import Heatmap from './Heatmap';
 import MoodMeter from './MoodMeter';
 import RepurposeModal from './RepurposeModal';
+import ConnectAccountModal from './ConnectAccountModal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const ComposeView = ({
@@ -18,6 +19,44 @@ const ComposeView = ({
     const [showAiMenu, setShowAiMenu] = useState(false);
     const [showRepurposeModal, setShowRepurposeModal] = useState(false);
     const [showShareToast, setShowShareToast] = useState(false);
+    const [showConnectModal, setShowConnectModal] = useState(false);
+    const [connectedAccounts, setConnectedAccounts] = useState({});
+    const [connectingPlatform, setConnectingPlatform] = useState(null);
+
+    // Fetch connection status on mount
+    useEffect(() => {
+        fetchConnectionStatus();
+    }, []);
+
+    const fetchConnectionStatus = async () => {
+        try {
+            const response = await fetch('/api/accounts/status');
+            const data = await response.json();
+
+            const status = {};
+            data.accounts.forEach(acc => {
+                status[acc.platform] = acc.username;
+            });
+            setConnectedAccounts(status);
+        } catch (error) {
+            console.error('Failed to fetch connection status:', error);
+        }
+    };
+
+    const handleConnectClick = (platformId) => {
+        setConnectingPlatform(platformId);
+        setShowConnectModal(true);
+    };
+
+    const handleConnectionSuccess = (username) => {
+        setConnectedAccounts({
+            ...connectedAccounts,
+            [connectingPlatform]: username
+        });
+        setShowConnectModal(false);
+        setConnectingPlatform(null);
+    };
+
 
     // Validation Logic
     const charCount = newPost.content.length;
@@ -92,6 +131,17 @@ const ComposeView = ({
                 onApply={(content) => setNewPost({ ...newPost, content })}
             />
 
+            {showConnectModal && connectingPlatform && (
+                <ConnectAccountModal
+                    platform={connectingPlatform}
+                    onClose={() => {
+                        setShowConnectModal(false);
+                        setConnectingPlatform(null);
+                    }}
+                    onSuccess={handleConnectionSuccess}
+                />
+            )}
+
             <div className="px-6 py-6 sm:p-8">
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-2">
@@ -129,24 +179,63 @@ const ComposeView = ({
                             {platforms.map((platform) => {
                                 const Icon = platform.icon;
                                 const isSelected = newPost.platforms.includes(platform.id);
+                                const isConnected = connectedAccounts[platform.id];
+                                const needsConnection = platform.id === 'threads';
+
                                 return (
-                                    <button
-                                        key={platform.id}
-                                        type="button"
-                                        onClick={() => togglePlatform(platform.id)}
-                                        className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-200 ${isSelected
-                                            ? 'bg-indigo-50 dark:bg-indigo-500/20 border-indigo-500 ring-1 ring-indigo-500 shadow-sm'
-                                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-100 hover:bg-slate-50 dark:hover:bg-slate-700'
-                                            }`}
-                                    >
-                                        <Icon className={`h-5 w-5 mb-1 ${platform.color}`} />
-                                        <span className={`text-[9px] font-medium truncate w-full text-center ${isSelected ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400'}`}>
-                                            {platform.name}
-                                        </span>
-                                    </button>
+                                    <div key={platform.id} className="relative">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (needsConnection && !isConnected) {
+                                                    handleConnectClick(platform.id);
+                                                } else {
+                                                    togglePlatform(platform.id);
+                                                }
+                                            }}
+                                            className={`w-full flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-200 ${isSelected
+                                                ? 'bg-indigo-50 dark:bg-indigo-500/20 border-indigo-500 ring-1 ring-indigo-500 shadow-sm'
+                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-100 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                                }`}
+                                        >
+                                            <Icon className={`h-5 w-5 mb-1 ${platform.color}`} />
+                                            <span className={`text-[9px] font-medium truncate w-full text-center ${isSelected ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-500 dark:text-slate-400'}`}>
+                                                {platform.name}
+                                            </span>
+                                        </button>
+
+                                        {/* Connection Status Badge */}
+                                        {needsConnection && (
+                                            <div className="absolute -top-1 -right-1">
+                                                {isConnected ? (
+                                                    <div className="bg-green-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
+                                                        <Check className="h-2 w-2" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="bg-amber-500 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                                                        !
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 );
                             })}
                         </div>
+
+                        {/* Connection Info */}
+                        {newPost.platforms.includes('threads') && connectedAccounts.threads && (
+                            <div className="mt-2 text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                                <Check className="h-3 w-3 text-green-500" />
+                                <span>Connected as @{connectedAccounts.threads}</span>
+                            </div>
+                        )}
+                        {newPost.platforms.includes('threads') && !connectedAccounts.threads && (
+                            <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                <span>Click Threads to connect your account</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Content Input Area */}
