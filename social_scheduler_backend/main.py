@@ -5,13 +5,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager
 from typing import List, Union
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__), timezone
+logger = logging.getLogger(__name__)
 
 from database import engine, Base, get_db, AsyncSessionLocal
 from models import SocialPost, PostStatus
