@@ -62,19 +62,36 @@ async def send_to_social(platform: str, content: str, media_url: str = None) -> 
 
     # --- Threads Integration ---
     elif platform == 'threads':
+        # Support alias for user convenience
+        token = os.getenv('THREADS_ACCESS_TOKEN') or os.getenv('THREADS_TOKEN')
         user_id = os.getenv('THREADS_USER_ID')
-        token = os.getenv('THREADS_ACCESS_TOKEN')
         
-        print(f"[DEBUG] Threads User ID Present: {bool(user_id)}")
         print(f"[DEBUG] Threads Token Present: {bool(token)}")
         
-        if not user_id or not token:
-            print(f"[{platform.upper()}] ERROR: Missing credentials (THREADS_USER_ID or THREADS_ACCESS_TOKEN).")
+        if not token:
+            print(f"[{platform.upper()}] ERROR: Missing Access Token (THREADS_ACCESS_TOKEN or THREADS_TOKEN).")
             return False
 
         base_url = "https://graph.threads.net/v1.0"
         
         async with httpx.AsyncClient() as client:
+            # Auto-fetch User ID if missing
+            if not user_id:
+                print(f"[{platform.upper()}] INFO: User ID missing. Attempting to fetch from API...")
+                try:
+                    me_url = f"{base_url}/me"
+                    me_resp = await client.get(me_url, params={'fields': 'id,username', 'access_token': token})
+                    if me_resp.status_code == 200:
+                        user_data = me_resp.json()
+                        user_id = user_data.get('id')
+                        print(f"[{platform.upper()}] SUCCESS: Fetched User ID: {user_id} (@{user_data.get('username')})")
+                    else:
+                        print(f"[{platform.upper()}] FAILED (Fetch ID): {me_resp.text}")
+                        return False
+                except Exception as e:
+                    print(f"[{platform.upper()}] ERROR Fetching ID: {e}")
+                    return False
+
             try:
                 # Step 1: Create Container
                 create_url = f"{base_url}/{user_id}/threads"
