@@ -8,7 +8,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends gcc && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements dan install
-COPY requirements.txt .
+# Copy semua fail dahulu (untuk debug context issues)
+COPY . .
+RUN ls -la
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy semua kod backend
