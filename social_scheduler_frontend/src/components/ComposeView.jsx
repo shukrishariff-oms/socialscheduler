@@ -10,7 +10,9 @@ const ComposeView = ({
     setNewPost,
     handleSubmit,
     loading,
-    platforms
+    platforms,
+    postImmediately,
+    setPostImmediately
 }) => {
     const [aiMode, setAiMode] = useState('Professional');
     const [showAiMenu, setShowAiMenu] = useState(false);
