@@ -89,20 +89,14 @@ function App() {
       const isoDate = new Date(newPost.scheduled_at).toISOString();
       let payload = [];
 
-      if (syncAll) {
-        // Create posts for major platforms when Sync All is active
-        // Excluding Facebook for now to avoid clutter, or we can include it. 
-        // User asked for "all platform previews" mirroring, usually LI, X, Threads.
-        const targetPlatforms = ['linkedin', 'twitter', 'threads'];
-        payload = targetPlatforms.map(p => ({
-          ...newPost,
-          platform: p,
-          scheduled_at: isoDate
-        }));
-      } else {
-        // Create single post
-        payload = [{ ...newPost, scheduled_at: isoDate }];
-      }
+      // Map selected platforms to payload
+      const payload = newPost.platforms.map(platformId => ({
+        content: newPost.content,
+        platform: platformId,
+        scheduled_at: isoDate,
+        media_url: newPost.media_url,
+        status: 'pending'
+      }));
 
       await createPost(payload);
 
