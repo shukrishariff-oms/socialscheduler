@@ -65,13 +65,13 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
         from threads_automation import ThreadsAutomation
         from encryption import get_encryptor
         from sqlalchemy import select
-        import models
+        from models import ConnectedAccount
         
         # Fetch credentials from database
         result = await db.execute(
-            select(models.ConnectedAccount).where(
-                models.ConnectedAccount.platform == 'threads',
-                models.ConnectedAccount.is_active == True
+            select(ConnectedAccount).where(
+                ConnectedAccount.platform == 'threads',
+                ConnectedAccount.is_active == True
             )
         )
         account = result.scalar_one_or_none()
