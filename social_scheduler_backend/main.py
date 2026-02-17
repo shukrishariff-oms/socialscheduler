@@ -147,6 +147,12 @@ async def list_posts(db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(select(SocialPost).order_by(SocialPost.scheduled_at))
         posts = result.scalars().all()
+        # Force UTC timezone if missing (SQLite fix)
+        for post in posts:
+            if post.scheduled_at and post.scheduled_at.tzinfo is None:
+                post.scheduled_at = post.scheduled_at.replace(tzinfo=timezone.utc)
+            if post.created_at and post.created_at.tzinfo is None:
+                post.created_at = post.created_at.replace(tzinfo=timezone.utc)
         return posts
     except Exception as e:
         logger.error(f"Error fetching posts: {e}")
