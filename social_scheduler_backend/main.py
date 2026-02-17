@@ -63,32 +63,20 @@ async def lifespan(app: FastAPI):
         
     # debug: Check Env Vars on Startup
     import os
-    import httpx
     print("--- STARTUP CONFIG CHECK ---")
-    print(f"[DEBUG] THREADS_USER_ID Present: {bool(os.getenv('THREADS_USER_ID'))}")
-    print(f"[DEBUG] THREADS_ACCESS_TOKEN Present: {bool(os.getenv('THREADS_ACCESS_TOKEN'))}")
+    print(f"[DEBUG] THREADS_USERNAME Present: {bool(os.getenv('THREADS_USERNAME'))}")
+    print(f"[DEBUG] THREADS_PASSWORD Present: {bool(os.getenv('THREADS_PASSWORD'))}")
     
-    # Test Threads Token Validity
-    token = os.getenv('THREADS_ACCESS_TOKEN') or os.getenv('THREADS_TOKEN')
-    if token:
-        print("[STARTUP] Testing Threads API token...")
-        try:
-            async with httpx.AsyncClient() as client:
-                test_resp = await client.get(
-                    "https://graph.threads.net/v1.0/me",
-                    params={'fields': 'id,username', 'access_token': token},
-                    timeout=10.0
-                )
-                if test_resp.status_code == 200:
-                    data = test_resp.json()
-                    print(f"[STARTUP] ✓ Threads token VALID - User: @{data.get('username')} (ID: {data.get('id')})")
-                else:
-                    print(f"[STARTUP] ✗ Threads token INVALID - Status: {test_resp.status_code}")
-                    print(f"[STARTUP] Error: {test_resp.text}")
-        except Exception as e:
-            print(f"[STARTUP] ✗ Threads API test failed: {e}")
+    # Note: Threads now uses browser automation instead of API
+    username = os.getenv('THREADS_USERNAME')
+    password = os.getenv('THREADS_PASSWORD')
+    
+    if username and password:
+        print(f"[STARTUP] ✓ Threads credentials configured for user: {username}")
+        print(f"[STARTUP] Browser automation will be used for Threads posting")
     else:
-        print("[STARTUP] ⚠ No Threads token found - Threads posting will fail")
+        print("[STARTUP] ⚠ Threads credentials not configured")
+        print("[STARTUP] Set THREADS_USERNAME and THREADS_PASSWORD to enable Threads posting")
     
     print("--- END CHECK ---")
     
