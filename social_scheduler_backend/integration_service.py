@@ -93,7 +93,6 @@ async def send_to_social(platform: str, content: str, media_url: str = None) -> 
                     return False
 
             try:
-            try:
                 # Step 1: Create Container
                 create_url = f"{base_url}/{user_id}/threads"
                 
