@@ -20,9 +20,8 @@ async def send_to_social(platform: str, content: str, media_url: str = None) -> 
         person_urn = os.getenv('LINKEDIN_PERSON_URN')
         
         if not token or not person_urn:
-            print(f"[{platform.upper()}] WARNING: Missing credentials. Simulating success.")
-            await asyncio.sleep(1) # Sim latency
-            return True
+            print(f"[{platform.upper()}] ERROR: Missing credentials. LinkedIN Token or Person URN not set.")
+            return False
 
         url = 'https://api.linkedin.com/v2/ugcPosts'
         headers = {
@@ -67,9 +66,8 @@ async def send_to_social(platform: str, content: str, media_url: str = None) -> 
         token = os.getenv('THREADS_ACCESS_TOKEN')
         
         if not user_id or not token:
-            print(f"[{platform.upper()}] WARNING: Missing credentials. Simulating success.")
-            await asyncio.sleep(1)
-            return True
+            print(f"[{platform.upper()}] ERROR: Missing credentials (THREADS_USER_ID or THREADS_ACCESS_TOKEN).")
+            return False
 
         base_url = "https://graph.threads.net/v1.0"
         
