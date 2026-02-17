@@ -65,6 +65,9 @@ async def send_to_social(platform: str, content: str, media_url: str = None) -> 
         user_id = os.getenv('THREADS_USER_ID')
         token = os.getenv('THREADS_ACCESS_TOKEN')
         
+        print(f"[DEBUG] Threads User ID Present: {bool(user_id)}")
+        print(f"[DEBUG] Threads Token Present: {bool(token)}")
+        
         if not user_id or not token:
             print(f"[{platform.upper()}] ERROR: Missing credentials (THREADS_USER_ID or THREADS_ACCESS_TOKEN).")
             return False
