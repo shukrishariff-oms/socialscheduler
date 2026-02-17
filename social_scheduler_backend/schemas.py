@@ -1,27 +1,46 @@
-from pydantic import BaseModel, ConfigDict, field_validator
-from datetime import datetime, timezone
+from pydantic import BaseModel
+from datetime import datetime
 from typing import Optional
-from models import PostStatus
 
-class PostBase(BaseModel):
+# Existing schemas
+class SocialPostCreate(BaseModel):
     content: str
     media_url: Optional[str] = None
     scheduled_at: datetime
     platform: str
 
-class PostCreate(PostBase):
-    @field_validator('scheduled_at')
-    def validate_scheduled_at(cls, v):
-        if v.tzinfo is None:
-             v = v.replace(tzinfo=timezone.utc)
-        if v <= datetime.now(timezone.utc):
-            raise ValueError('Scheduled time must be in the future')
-        return v
-
-class PostResponse(PostBase):
+class SocialPostResponse(BaseModel):
     id: int
+    content: str
+    media_url: Optional[str]
+    scheduled_at: datetime
+    platform: str
     status: str
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: Optional[datetime]
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
+
+# New schemas for account connection
+class ConnectAccountRequest(BaseModel):
+    username: str
+    password: str
+
+class ConnectAccountResponse(BaseModel):
+    success: bool
+    username: Optional[str] = None
+    error: Optional[str] = None
+
+class AccountStatus(BaseModel):
+    platform: str
+    username: str
+    connected_at: str
+    last_used: Optional[str] = None
+
+class AccountsStatusResponse(BaseModel):
+    accounts: list[AccountStatus]
+
+class DisconnectAccountResponse(BaseModel):
+    success: bool
+    error: Optional[str] = None

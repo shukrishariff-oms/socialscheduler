@@ -81,6 +81,49 @@ class ThreadsAutomation:
                     pass
                 return False
     
+    async def test_login(self, username: str, password: str) -> bool:
+        """
+        Test login without posting (for connection verification)
+        Returns: True if login successful, False otherwise
+        """
+        print(f"[THREADS_TEST] Testing login for user: {username}")
+        
+        async with async_playwright() as p:
+            try:
+                # Launch browser
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-setuid-sandbox']
+                )
+                context = await browser.new_context()
+                page = await context.new_page()
+                
+                # Perform login
+                await self._login(page, username, password)
+                
+                # Check if login successful
+                is_logged_in = await self._check_login_status(page)
+                
+                if is_logged_in:
+                    # Save session for future use
+                    await self._save_session(context, username)
+                    print(f"[THREADS_TEST] ✓ Login successful for {username}")
+                else:
+                    print(f"[THREADS_TEST] ✗ Login failed for {username}")
+                
+                await browser.close()
+                return is_logged_in
+                
+            except Exception as e:
+                print(f"[THREADS_TEST] ✗ Error: {e}")
+                import traceback
+                traceback.print_exc()
+                try:
+                    await browser.close()
+                except:
+                    pass
+                return False
+    
     async def _get_or_create_context(self, browser, username):
         """Load saved session or create new context"""
         session_file = self.session_dir / f"{username}_session.json"

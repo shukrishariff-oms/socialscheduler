@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-async def send_to_social(platform: str, content: str, media_url: str = None) -> bool:
+async def send_to_social(platform: str, content: str, media_url: str = None, db=None) -> bool:
     """
     Sends content to social media platforms using real APIs.
     Falls back to mock mode if tokens are missing.
@@ -60,27 +60,44 @@ async def send_to_social(platform: str, content: str, media_url: str = None) -> 
                 print(f"[{platform.upper()}] ERROR: {e}")
                 return False
 
-    # --- Threads Integration (Browser Automation) ---
+    # --- Threads Integration (Browser Automation with DB Credentials) ---
     elif platform == 'threads':
-        # Use browser automation instead of API
         from threads_automation import ThreadsAutomation
+        from encryption import get_encryptor
+        from sqlalchemy import select
+        import models
         
-        username = os.getenv('THREADS_USERNAME')
-        password = os.getenv('THREADS_PASSWORD')
+        # Fetch credentials from database
+        result = await db.execute(
+            select(models.ConnectedAccount).where(
+                models.ConnectedAccount.platform == 'threads',
+                models.ConnectedAccount.is_active == True
+            )
+        )
+        account = result.scalar_one_or_none()
         
-        print(f"[DEBUG] Threads Username Present: {bool(username)}")
-        print(f"[DEBUG] Threads Password Present: {bool(password)}")
-        
-        if not username or not password:
-            print(f"[{platform.upper()}] ERROR: Missing credentials (THREADS_USERNAME or THREADS_PASSWORD).")
-            print(f"[{platform.upper()}] Please set THREADS_USERNAME and THREADS_PASSWORD environment variables.")
+        if not account:
+            print(f"[{platform.upper()}] ERROR: No connected Threads account found")
+            print(f"[{platform.upper()}] Please connect your Threads account first via the UI")
             return False
         
         try:
+            # Decrypt credentials
+            encryptor = get_encryptor()
+            username = account.username
+            password = encryptor.decrypt(account.encrypted_password)
+            
+            print(f"[{platform.upper()}] Using connected account: @{username}")
+            
+            # Use automation
             automation = ThreadsAutomation()
             success = await automation.post_to_threads(username, password, content, media_url)
             
             if success:
+                # Update last_used_at
+                from datetime import datetime
+                account.last_used_at = datetime.utcnow()
+                await db.commit()
                 print(f"[{platform.upper()}] SUCCESS: Posted via browser automation")
             else:
                 print(f"[{platform.upper()}] FAILED: Browser automation failed")

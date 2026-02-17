@@ -108,6 +108,128 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==================== ACCOUNT CONNECTION ENDPOINTS ====================
+
+from encryption import get_encryptor
+from threads_automation import ThreadsAutomation
+
+@app.post("/api/accounts/connect/threads")
+async def connect_threads_account(
+    request: schemas.ConnectAccountRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Test login and save Threads credentials"""
+    try:
+        # Test login with Playwright
+        automation = ThreadsAutomation()
+        success = await automation.test_login(request.username, request.password)
+        
+        if not success:
+            return schemas.ConnectAccountResponse(
+                success=False,
+                error="Invalid credentials or login failed. Please check your username and password."
+            )
+        
+        # Encrypt password
+        encryptor = get_encryptor()
+        encrypted_pw = encryptor.encrypt(request.password)
+        
+        # Check if account already exists
+        result = await db.execute(
+            select(models.ConnectedAccount).where(
+                models.ConnectedAccount.platform == 'threads',
+                models.ConnectedAccount.username == request.username
+            )
+        )
+        existing = result.scalar_one_or_none()
+        
+        if existing:
+            # Update existing
+            existing.encrypted_password = encrypted_pw
+            existing.is_active = True
+            existing.connected_at = datetime.utcnow()
+        else:
+            # Create new
+            new_account = models.ConnectedAccount(
+                platform='threads',
+                username=request.username,
+                encrypted_password=encrypted_pw
+            )
+            db.add(new_account)
+        
+        await db.commit()
+        
+        return schemas.ConnectAccountResponse(
+            success=True,
+            username=request.username
+        )
+        
+    except Exception as e:
+        print(f"[CONNECT] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return schemas.ConnectAccountResponse(
+            success=False,
+            error=f"Connection error: {str(e)}"
+        )
+
+@app.get("/api/accounts/status")
+async def get_accounts_status(db: AsyncSession = Depends(get_db)):
+    """Get connection status for all platforms"""
+    try:
+        result = await db.execute(
+            select(models.ConnectedAccount).where(
+                models.ConnectedAccount.is_active == True
+            )
+        )
+        accounts = result.scalars().all()
+        
+        return schemas.AccountsStatusResponse(
+            accounts=[
+                schemas.AccountStatus(
+                    platform=acc.platform,
+                    username=acc.username,
+                    connected_at=acc.connected_at.isoformat(),
+                    last_used=acc.last_used_at.isoformat() if acc.last_used_at else None
+                )
+                for acc in accounts
+            ]
+        )
+    except Exception as e:
+        print(f"[STATUS] Error: {e}")
+        return schemas.AccountsStatusResponse(accounts=[])
+
+@app.delete("/api/accounts/disconnect/{platform}")
+async def disconnect_account(
+    platform: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Disconnect a platform account"""
+    try:
+        result = await db.execute(
+            select(models.ConnectedAccount).where(
+                models.ConnectedAccount.platform == platform,
+                models.ConnectedAccount.is_active == True
+            )
+        )
+        account = result.scalar_one_or_none()
+        
+        if account:
+            account.is_active = False
+            await db.commit()
+            return schemas.DisconnectAccountResponse(success=True)
+        
+        return schemas.DisconnectAccountResponse(
+            success=False,
+            error="Account not found"
+        )
+    except Exception as e:
+        print(f"[DISCONNECT] Error: {e}")
+        return schemas.DisconnectAccountResponse(
+            success=False,
+            error=str(e)
+        )
+
 # --- API Endpoints ---
 
 @app.post("/posts", response_model=List[PostResponse])
