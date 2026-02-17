@@ -115,8 +115,20 @@ function App() {
         },
       });
     } catch (error) {
+    } catch (error) {
       console.error("Failed to create post", error);
-      toast.error(error.response?.data?.detail || "Failed to create post");
+      let errorMsg = "Failed to create post";
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (Array.isArray(detail)) {
+          errorMsg = detail.map(e => e.msg).join(', ');
+        } else if (typeof detail === 'object') {
+          errorMsg = JSON.stringify(detail);
+        } else {
+          errorMsg = String(detail);
+        }
+      }
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }

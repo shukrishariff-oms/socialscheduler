@@ -5,7 +5,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager
 from typing import List, Union
-from datetime import datetime, timezone
+from datetime import datetime
+import logging
+import json
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__), timezone
 
 from database import engine, Base, get_db, AsyncSessionLocal
 from models import SocialPost, PostStatus
@@ -138,9 +144,13 @@ async def create_posts(posts: Union[PostCreate, List[PostCreate]], db: AsyncSess
 
 @app.get("/posts", response_model=List[PostResponse])
 async def list_posts(db: AsyncSession = Depends(get_db)):
-    # Sort by scheduled_at desc
-    result = await db.execute(select(SocialPost).order_by(SocialPost.scheduled_at.desc()))
-    return result.scalars().all()
+    try:
+        result = await db.execute(select(SocialPost).order_by(SocialPost.scheduled_at))
+        posts = result.scalars().all()
+        return posts
+    except Exception as e:
+        logger.error(f"Error fetching posts: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/posts/{post_id}")
 async def delete_post(post_id: int, db: AsyncSession = Depends(get_db)):
