@@ -115,8 +115,8 @@ function App() {
         },
       });
     } catch (error) {
-    } catch (error) {
       console.error("Failed to create post", error);
+      let errorMsg = "Failed to create post";
       let errorMsg = "Failed to create post";
       if (error.response?.data?.detail) {
         const detail = error.response.data.detail;
