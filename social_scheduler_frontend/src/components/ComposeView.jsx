@@ -80,6 +80,22 @@ const ComposeView = ({
         setShowAiMenu(false);
     };
 
+
+    // Post Now Logic
+    const [postImmediately, setPostImmediately] = useState(false);
+
+    useEffect(() => {
+        if (postImmediately) {
+            // Set to 2 minutes from now to satisfy "future" validation safely
+            const now = new Date();
+            now.setMinutes(now.getMinutes() + 2);
+            now.setSeconds(0, 0);
+            // Format for datetime-local: YYYY-MM-DDTHH:mm
+            const formatted = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+            setNewPost(prev => ({ ...prev, scheduled_at: formatted }));
+        }
+    }, [postImmediately, setNewPost]);
+
     return (
         <div className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border border-white/50 dark:border-white/5 shadow-xl shadow-slate-200/50 dark:shadow-black/50 rounded-2xl overflow-hidden transition-colors relative">
 
@@ -132,8 +148,8 @@ const ComposeView = ({
                                         type="button"
                                         onClick={() => togglePlatform(platform.id)}
                                         className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-200 ${isSelected
-                                                ? 'bg-indigo-50 dark:bg-indigo-500/20 border-indigo-500 ring-1 ring-indigo-500 shadow-sm'
-                                                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-100 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                            ? 'bg-indigo-50 dark:bg-indigo-500/20 border-indigo-500 ring-1 ring-indigo-500 shadow-sm'
+                                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-100 hover:bg-slate-50 dark:hover:bg-slate-700'
                                             }`}
                                     >
                                         <Icon className={`h-5 w-5 mb-1 ${platform.color}`} />
@@ -175,8 +191,8 @@ const ComposeView = ({
                             <textarea
                                 required
                                 className={`block w-full rounded-t-xl border-x border-t transition-all duration-300 p-4 pb-4 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 shadow-sm resize-none min-h-[160px] ${isOverLimit
-                                        ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50 dark:bg-rose-500/5'
-                                        : 'border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-indigo-500/20 focus:border-indigo-500'
+                                    ? 'border-rose-500 ring-2 ring-rose-500/20 bg-rose-50 dark:bg-rose-500/5'
+                                    : 'border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-indigo-500/20 focus:border-indigo-500'
                                     }`}
                                 placeholder={getPlaceholder()}
                                 value={newPost.content}
@@ -186,8 +202,8 @@ const ComposeView = ({
 
                         {/* Toolbar for AI & Actions (Attached below textarea) */}
                         <div className={`p-2 border-x border-b rounded-b-xl flex items-center justify-between transition-colors ${isOverLimit
-                                ? 'bg-rose-50 dark:bg-rose-500/5 border-rose-500'
-                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
+                            ? 'bg-rose-50 dark:bg-rose-500/5 border-rose-500'
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
                             }`}>
                             <div className="flex items-center gap-2">
                                 <div className="relative">
@@ -250,21 +266,32 @@ const ComposeView = ({
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Schedule Time</label>
+                            <label className="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                                <span>Schedule Time</span>
+                                <label className="flex items-center space-x-2 cursor-pointer">
+                                    <span className={`text-[10px] uppercase font-bold ${postImmediately ? 'text-indigo-500' : 'text-slate-400'}`}>Post Now ⚡</span>
+                                    <div className="relative">
+                                        <input type="checkbox" className="sr-only" checked={postImmediately} onChange={() => setPostImmediately(!postImmediately)} />
+                                        <div className={`block w-8 h-4 rounded-full ${postImmediately ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                                        <div className={`dot absolute left-1 top-1 bg-white w-2 h-2 rounded-full transition ${postImmediately ? 'transform translate-x-4' : ''}`}></div>
+                                    </div>
+                                </label>
+                            </label>
                             <div className="relative">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <Clock className="h-4 w-4 text-slate-400" />
                                 </div>
                                 <input
                                     type="datetime-local"
-                                    required
-                                    className="block w-full rounded-xl border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 shadow-sm transition duration-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-indigo-500/20 focus:bg-white dark:focus:bg-slate-800"
+                                    required={!postImmediately}
+                                    disabled={postImmediately}
+                                    className={`block w-full rounded-xl border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 pl-10 pr-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 shadow-sm transition duration-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 dark:focus:ring-indigo-500/20 focus:bg-white dark:focus:bg-slate-800 ${postImmediately ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     value={newPost.scheduled_at}
                                     onChange={(e) => setNewPost({ ...newPost, scheduled_at: e.target.value })}
                                 />
                             </div>
 
-                            <Heatmap onTimeSelect={(d, h) => console.log('Selected', d, h)} />
+                            {!postImmediately && <Heatmap onTimeSelect={(d, h) => console.log('Selected', d, h)} />}
                         </div>
                     </div>
 
@@ -285,16 +312,18 @@ const ComposeView = ({
                             type="submit"
                             disabled={loading || isOverLimit || newPost.platforms.length === 0}
                             className={`flex-[2] py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white transition-all duration-200 transform flex items-center justify-center gap-2 ${(isOverLimit || newPost.platforms.length === 0)
-                                    ? 'bg-slate-400 cursor-not-allowed shadow-none'
-                                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30 hover:-translate-y-0.5 active:translate-y-0'
-                                }`}
+                                ? 'bg-slate-400 cursor-not-allowed shadow-none'
+                                : postImmediately
+                                    ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-orange-500/30'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30'
+                                } hover:-translate-y-0.5 active:translate-y-0`}
                         >
                             {loading ? (
-                                <span>Scheduling...</span>
+                                <span>{postImmediately ? 'Posting...' : 'Scheduling...'}</span>
                             ) : (
                                 <>
                                     <Send className="h-4 w-4" />
-                                    <span>Schedule Post</span>
+                                    <span>{postImmediately ? 'Post Immediately ⚡' : 'Schedule Post'}</span>
                                 </>
                             )}
                         </button>
