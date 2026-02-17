@@ -22,6 +22,10 @@ class SocialPostResponse(BaseModel):
     class Config:
         from_attributes = True
 
+# Aliases for backward compatibility
+PostCreate = SocialPostCreate
+PostResponse = SocialPostResponse
+
 # New schemas for account connection
 class ConnectAccountRequest(BaseModel):
     username: str
