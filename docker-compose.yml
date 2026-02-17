@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./social_scheduler_backend
+    container_name: socialcmd_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./social_scheduler_backend:/app
+      - ./social_scheduler_backend/social_posts.db:/app/social_posts.db
+    env_file:
+      - ./social_scheduler_backend/.env
+    restart: always
+
+  frontend:
+    build:
+      context: ./social_scheduler_frontend
+    container_name: socialcmd_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
