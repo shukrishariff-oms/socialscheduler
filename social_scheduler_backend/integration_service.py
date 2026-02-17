@@ -93,34 +93,40 @@ async def send_to_social(platform: str, content: str, media_url: str = None) -> 
                     return False
 
             try:
+            try:
                 # Step 1: Create Container
                 create_url = f"{base_url}/{user_id}/threads"
-                create_params = {
+                
+                # Use data for POST body, access_token in params
+                create_data = {
                     'media_type': 'TEXT',
-                    'text': content,
-                    'access_token': token
+                    'text': content
                 }
                 
-                resp1 = await client.post(create_url, params=create_params)
+                print(f"[{platform.upper()}] Creating container with data: {create_data}")
+                
+                resp1 = await client.post(create_url, params={'access_token': token}, data=create_data)
+                
                 if resp1.status_code != 200:
-                    print(f"[{platform.upper()}] FAILED (Container): {resp1.text}")
+                    print(f"[{platform.upper()}] FAILED (Container): {resp1.status_code} - {resp1.text}")
                     return False
                 
                 container_id = resp1.json().get('id')
+                print(f"[{platform.upper()}] Container Created: {container_id}")
                 
                 # Step 2: Publish Container
                 publish_url = f"{base_url}/{user_id}/threads_publish"
-                publish_params = {
-                    'creation_id': container_id,
-                    'access_token': token
+                publish_data = {
+                    'creation_id': container_id
                 }
                 
-                resp2 = await client.post(publish_url, params=publish_params)
+                resp2 = await client.post(publish_url, params={'access_token': token}, data=publish_data)
+                
                 if resp2.status_code == 200:
                     print(f"[{platform.upper()}] SUCCESS: Published to Threads.")
                     return True
                 else:
-                    print(f"[{platform.upper()}] FAILED (Publish): {resp2.text}")
+                    print(f"[{platform.upper()}] FAILED (Publish): {resp2.status_code} - {resp2.text}")
                     return False
                     
             except Exception as e:
