@@ -144,9 +144,9 @@ async def connect_threads_account(
         
         # Check if account already exists
         result = await db.execute(
-            select(models.ConnectedAccount).where(
-                models.ConnectedAccount.platform == 'threads',
-                models.ConnectedAccount.username == request.username
+            select(ConnectedAccount).where(
+                ConnectedAccount.platform == 'threads',
+                ConnectedAccount.username == request.username
             )
         )
         existing = result.scalar_one_or_none()
