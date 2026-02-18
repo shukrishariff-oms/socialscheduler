@@ -15,6 +15,10 @@ import os
 import urllib.parse
 import httpx
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 from database import engine, Base, get_db, AsyncSessionLocal
 from models import SocialPost, PostStatus, ConnectedAccount
 from schemas import (
