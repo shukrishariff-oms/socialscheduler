@@ -6,7 +6,7 @@ from typing import Optional
 class SocialPostCreate(BaseModel):
     content: str
     media_url: Optional[str] = None
-    scheduled_at: datetime
+    scheduled_at: Optional[datetime] = None
     platform: str
 
 class SocialPostResponse(BaseModel):

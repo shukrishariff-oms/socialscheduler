@@ -13,7 +13,9 @@ from typing import List, Union, Optional
 
 # --- Third-Party Imports ---
 import httpx
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -488,7 +490,7 @@ async def create_posts(posts: Union[PostCreate, List[PostCreate]], db: AsyncSess
         new_post = SocialPost(
             content=post_data.content,
             media_url=post_data.media_url,
-            scheduled_at=post_data.scheduled_at,
+            scheduled_at=post_data.scheduled_at or datetime.now(timezone.utc),
             platform=post_data.platform,
             status=PostStatus.pending
         )
