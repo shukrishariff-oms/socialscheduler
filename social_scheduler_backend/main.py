@@ -90,13 +90,14 @@ async def check_scheduled_posts():
                         logger.error(f"[SCHEDULER] Post {post.id} -> FAILED. Error: {error_msg}")
 
                     post.updated_at = datetime.now(timezone.utc)
+                    # Force commit immediately to persist status
+                    await session.commit()
                     
                 except Exception as e:
                     logger.error(f"[SCHEDULER] Error publishing post {post.id}: {e}")
                     post.status = PostStatus.failed
-                
-                # Commit processing changes per post to minimize rollback impact
-                await session.commit()
+                    # Force commit on exception to save failed state
+                    await session.commit()
             
         except Exception as e:
             logger.error(f"[SCHEDULER] Error details: {e}")
