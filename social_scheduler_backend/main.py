@@ -1,18 +1,19 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from contextlib import asynccontextmanager
 from typing import List, Union
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import logging
 import json
 import os
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+import urllib.parse
+import httpx
 
 from database import engine, Base, get_db, AsyncSessionLocal
 from models import SocialPost, PostStatus, ConnectedAccount
