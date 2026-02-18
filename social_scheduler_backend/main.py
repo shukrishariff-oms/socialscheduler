@@ -59,25 +59,41 @@ THREADS_REDIRECT_URI = os.getenv(
 async def check_scheduled_posts():
     """Checks the database for posts that are 'pending' and scheduled_at <= now."""
     async with AsyncSessionLocal() as session:
-        now = datetime.now(timezone.utc)
-        result = await session.execute(
-            select(SocialPost).where(
-                SocialPost.status == PostStatus.pending,
-                SocialPost.scheduled_at <= now
+        try:
+            # Use UTC for all time comparisons
+            now = datetime.now(timezone.utc)
+            
+            result = await session.execute(
+                select(SocialPost).where(
+                    SocialPost.status == "pending",
+                    SocialPost.scheduled_at <= now
+                )
             )
-        )
-        posts_to_publish = result.scalars().all()
-        logger.info(f"[SCHEDULER] Checked at {now}. Found {len(posts_to_publish)} pending posts due.")
+            posts_to_publish = result.scalars().all()
+            
+            if posts_to_publish:
+                logger.info(f"[SCHEDULER] Checked at {now}. Found {len(posts_to_publish)} pending posts due.")
 
-        for post in posts_to_publish:
-            try:
-                success = await send_to_social(post.platform, post.content, post.media_url)
-                post.status = PostStatus.published if success else PostStatus.failed
-                logger.info(f"[SCHEDULER] Post {post.id} -> {'published' if success else 'failed'}")
-            except Exception as e:
-                logger.error(f"[SCHEDULER] Error publishing post {post.id}: {e}")
-                post.status = PostStatus.failed
-            await session.commit()
+            for post in posts_to_publish:
+                try:
+                    # Pass session to allow token retrieval from DB
+                    success = await send_to_social(post.platform, post.content, post.media_url, db=session)
+                    
+                    post.status = PostStatus.published if success else PostStatus.failed
+                    post.updated_at = datetime.now(timezone.utc)
+                    
+                    logger.info(f"[SCHEDULER] Post {post.id} -> {'published' if success else 'failed'}")
+                except Exception as e:
+                    logger.error(f"[SCHEDULER] Error publishing post {post.id}: {e}")
+                    post.status = PostStatus.failed
+            
+            # Commit processing changes
+            if posts_to_publish:
+                await session.commit()
+            
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error details: {e}")
+            await session.rollback()
 
 
 # ============================================================
@@ -98,57 +114,41 @@ async def lifespan(app: FastAPI):
         raise
 
     # Log Threads config on startup
-    logger.info("--- STARTUP CONFIG CHECK ---")
-    logger.info(f"[THREADS] App ID present: {bool(THREADS_APP_ID)} (len={len(THREADS_APP_ID)})")
-    logger.info(f"[THREADS] App Secret present: {bool(THREADS_APP_SECRET)}")
-    logger.info(f"[THREADS] Redirect URI: {THREADS_REDIRECT_URI}")
-    logger.info("--- END CHECK ---")
+    if THREADS_APP_ID:
+        logger.info(f"[STARTUP] Threads App ID configured: {THREADS_APP_ID[:4]}***")
+    else:
+        logger.warning("[STARTUP] THREADS_APP_ID not set!")
 
-    # Sync Env Var Token to Database (Fix for Frontend UI)
+    # Auto-sync Threads Token from Env to DB if needed
     try:
-        if THREADS_ACCESS_TOKEN := os.getenv("THREADS_ACCESS_TOKEN"):
-             # Create a new session for this startup task
-            async with AsyncSession(engine) as session:
-                async with session.begin():
-                    # Check if account exists
-                    result = await session.execute(
-                        select(ConnectedAccount).where(
-                            ConnectedAccount.platform == 'threads'
-                        )
+        env_token = os.getenv("THREADS_ACCESS_TOKEN")
+        if env_token:
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(ConnectedAccount).where(ConnectedAccount.platform == 'threads')
+                )
+                existing = result.scalar_one_or_none()
+                
+                if not existing:
+                    logger.info("[STARTUP] Syncing Threads Token from Env to DB...")
+                    encryptor = get_encryptor()
+                    encrypted_token = encryptor.encrypt(env_token)
+                    new_account = ConnectedAccount(
+                        platform='threads',
+                        username=os.getenv("THREADS_USERNAME", "env_user"),
+                        access_token=encrypted_token,
+                        token_expires_at=datetime.now(timezone.utc) + timedelta(days=60)
                     )
-                    existing = result.scalar_one_or_none()
-                    
-                    if not existing:
-                        logger.info("[STARTUP] Syncing Threads Token from Env Var to Database...")
-                        # Encrypt token
-                        encryptor = get_encryptor()
-                        encrypted_token = encryptor.encrypt(THREADS_ACCESS_TOKEN)
-                        
-                        # Insert
-                        new_account = ConnectedAccount(
-                            platform='threads',
-                            username=os.getenv("THREADS_USERNAME", "shukrishariff.ss"),
-                            access_token=encrypted_token,
-                            is_active=True,
-                            token_expires_at=datetime.now(timezone.utc) + timedelta(days=60)
-                        )
-                        session.add(new_account)
-                        logger.info("[STARTUP] Threads account synced to DB successfully!")
-                    else:
-                        logger.info("[STARTUP] Threads account already exists in DB. Skipping sync.")
+                    db.add(new_account)
+                    await db.commit()
     except Exception as e:
-        logger.error(f"[STARTUP] Error syncing Env Var token to DB: {e}")
+        logger.error(f"[STARTUP] Error syncing env token: {e}")
 
-    # Start scheduler
+    # Start Scheduler
     try:
-        scheduler.add_job(
-            check_scheduled_posts,
-            IntervalTrigger(seconds=10),
-            id="check_posts",
-            replace_existing=True,
-        )
+        scheduler.add_job(check_scheduled_posts, IntervalTrigger(seconds=10))
         scheduler.start()
-        logger.info("[SCHEDULER] Started.")
+        logger.info("[SCHEDULER] Started background job (check every 10s).")
     except Exception as e:
         logger.error(f"[STARTUP] CRITICAL: Scheduler failed to start: {e}")
         raise
@@ -173,6 +173,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log validation errors for debugging 422 responses."""
+    logger.error(f"[VALIDATION ERROR] {exc.errors()}")
+    try:
+        body = await request.json()
+        logger.error(f"[VALIDATION BODY] {body}")
+    except:
+        pass
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
+
 
 # ============================================================
 # Debug Endpoint
@@ -184,15 +198,15 @@ async def debug_threads_config():
     app_id = os.getenv("THREADS_APP_ID", "")
     secret = os.getenv("THREADS_APP_SECRET", "")
     redirect = os.getenv("THREADS_REDIRECT_URI", "")
+    token_env = os.getenv("THREADS_ACCESS_TOKEN", "")
+    
     return {
         "app_id_present": bool(app_id),
         "app_id_length": len(app_id),
-        "app_id_preview": f"{app_id[:3]}...{app_id[-3:]}" if len(app_id) > 6 else app_id,
-        "app_id_has_spaces": " " in app_id,
-        "app_id_is_digit": app_id.strip().isdigit() if app_id else False,
         "secret_present": bool(secret),
-        "secret_length": len(secret),
         "redirect_uri": redirect,
+        "token_in_env": bool(token_env),
+        "token_preview": f"{token_env[:5]}..." if token_env else None
     }
 
 
@@ -292,7 +306,6 @@ async def threads_setup_page():
     """)
 
 @app.post("/api/auth/threads/store-token")
-
 async def store_threads_token(
     request: dict,
     db: AsyncSession = Depends(get_db)
@@ -487,17 +500,22 @@ async def create_posts(posts: Union[PostCreate, List[PostCreate]], db: AsyncSess
                 status_code=400,
                 detail=f"Content too long for {post_data.platform.capitalize()}."
             )
+        
+        # Ensure scheduled_at is UTC
+        scheduled_time = post_data.scheduled_at or datetime.now(timezone.utc)
+        if scheduled_time.tzinfo is None:
+            scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+
         new_post = SocialPost(
             content=post_data.content,
             media_url=post_data.media_url,
-            scheduled_at=post_data.scheduled_at or datetime.now(timezone.utc),
+            scheduled_at=scheduled_time,
             platform=post_data.platform,
-            status=PostStatus.pending
+            status="pending"  # Explicitly set lowercase pending
         )
         db.add(new_post)
-        db.add(new_post)
         created_posts.append(new_post)
-        logger.info(f"[API] Created post for {post_data.platform} scheduled at {post_data.scheduled_at}")
+        logger.info(f"[API] Created post for {post_data.platform} scheduled at {scheduled_time}")
 
     await db.commit()
     for p in created_posts:
