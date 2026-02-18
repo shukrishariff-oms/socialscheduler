@@ -211,6 +211,53 @@ async def disconnect_account(platform: str, db: AsyncSession = Depends(get_db)):
 # Threads OAuth Endpoints
 # ============================================================
 
+@app.post("/api/auth/threads/store-token")
+async def store_threads_token(
+    request: dict,
+    db: AsyncSession = Depends(get_db)
+):
+    """Store a manually-generated Threads access token directly into the database."""
+    token = request.get("access_token", "").strip()
+    username = request.get("username", "shukrishariff.ss").strip()
+
+    if not token:
+        raise HTTPException(status_code=400, detail="access_token is required")
+
+    try:
+        encryptor = get_encryptor()
+        encrypted_token = encryptor.encrypt(token)
+
+        # Check if account already exists
+        result = await db.execute(
+            select(ConnectedAccount).where(
+                ConnectedAccount.platform == "threads",
+                ConnectedAccount.username == username
+            )
+        )
+        account = result.scalar_one_or_none()
+
+        if account:
+            account.access_token = encrypted_token
+            account.is_active = True
+            account.token_expires_at = datetime.now(timezone.utc) + timedelta(days=60)
+        else:
+            account = ConnectedAccount(
+                platform="threads",
+                username=username,
+                access_token=encrypted_token,
+                is_active=True,
+                token_expires_at=datetime.now(timezone.utc) + timedelta(days=60)
+            )
+            db.add(account)
+
+        await db.commit()
+        logger.info(f"[THREADS] Token stored for @{username}")
+        return {"success": True, "username": username, "message": "Token stored successfully"}
+
+    except Exception as e:
+        logger.error(f"[THREADS] Error storing token: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/auth/threads/authorize")
 async def threads_authorize():
     """Redirect user to Threads OAuth authorization page."""
