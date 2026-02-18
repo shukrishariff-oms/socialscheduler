@@ -9,7 +9,7 @@ import logging
 import urllib.parse
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Tuple
 
 # --- Third-Party Imports ---
 import httpx

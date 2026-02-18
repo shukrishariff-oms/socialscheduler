@@ -3,7 +3,7 @@ import os
 import httpx
 from datetime import datetime
 from dotenv import load_dotenv
-from typing import Optional, Union, Tuple
+from typing import Optional, Union, Tuple, List
 
 # Load environment variables
 load_dotenv()
@@ -74,30 +74,30 @@ async def send_to_social(platform: str, content: str, media_url: Optional[str] =
         access_token = None
         username = None
 
-        # 1. Try Environment Variable (Priority/Backup)
-        if os.getenv("THREADS_ACCESS_TOKEN"):
-            access_token = os.getenv("THREADS_ACCESS_TOKEN")
-            username = os.getenv("THREADS_USERNAME", "env_user")
-            print(f"[{platform.upper()}] Using token from Environment Variables for @{username}")
-
-        # 2. Try Database (if no env var)
-        if not access_token and db:
-            result = await db.execute(
-                select(ConnectedAccount).where(
-                    ConnectedAccount.platform == 'threads',
-                    ConnectedAccount.is_active == True
+        # 1. Try Database First (Priority)
+        if db:
+            try:
+                result = await db.execute(
+                    select(ConnectedAccount).where(
+                        ConnectedAccount.platform == 'threads',
+                        ConnectedAccount.is_active == True
+                    )
                 )
-            )
-            account = result.scalar_one_or_none()
-            
-            if account and account.access_token:
-                try:
+                account = result.scalar_one_or_none()
+                
+                if account and account.access_token:
                     encryptor = get_encryptor()
                     access_token = encryptor.decrypt(account.access_token)
                     username = account.username
                     print(f"[{platform.upper()}] Using connected account from DB: @{username}")
-                except Exception as e:
-                    print(f"[{platform.upper()}] Error decrypting DB token: {e}")
+            except Exception as e:
+                print(f"[{platform.upper()}] Error decrypting DB token: {e}")
+
+        # 2. Fallback to Environment Variable
+        if not access_token and os.getenv("THREADS_ACCESS_TOKEN"):
+            access_token = os.getenv("THREADS_ACCESS_TOKEN")
+            username = os.getenv("THREADS_USERNAME", "env_user")
+            print(f"[{platform.upper()}] Using token from Environment Variables (Fallback) for @{username}")
 
         if not access_token:
             msg = "No access token found (checked Env Var & DB)"
