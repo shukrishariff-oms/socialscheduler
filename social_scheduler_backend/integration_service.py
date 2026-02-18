@@ -104,7 +104,7 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
         try:
             # Initialize API service
             
-            print(f"[{platform.upper()}] Using connected account: @{account.username}")
+            print(f"[{platform.upper()}] Using connected account: @{username}")
             
             # Initialize API service
             api = ThreadsAPIService(access_token)
@@ -119,9 +119,12 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
             
             if result["success"]:
                 print(f"[{platform.upper()}] ✓ Successfully posted! ID: {result.get('post_id')}")
-                # Update last_used_at
-                account.last_used_at = datetime.utcnow()
-                await db.commit()
+                
+                # Update last_used_at ONLY if account exists in DB
+                if account:
+                    account.last_used_at = datetime.utcnow()
+                    await db.commit()
+                
                 return True
             else:
                 print(f"[{platform.upper()}] ✗ Failed to post: {result.get('error')}")
