@@ -3,7 +3,11 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 DATABASE_URL = "sqlite+aiosqlite:///./social_posts.db"
 
-engine = create_async_engine(DATABASE_URL, echo=True)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=True,
+    connect_args={"check_same_thread": False}
+)
 
 AsyncSessionLocal = sessionmaker(
     bind=engine,

@@ -84,7 +84,9 @@ async def check_scheduled_posts():
                         post.external_post_id = post_id
                         logger.info(f"[SCHEDULER] Post {post.id} -> PUBLISHED. ID: {post_id}")
                     else:
-                        post.status = PostStatus.failed
+                        # Save error message to status column for dashboard visibility
+                        error_preview = error_msg[:250] if error_msg else "Unknown Error"
+                        post.status = f"failed: {error_preview}"
                         logger.error(f"[SCHEDULER] Post {post.id} -> FAILED. Error: {error_msg}")
 
                     post.updated_at = datetime.now(timezone.utc)
@@ -509,7 +511,14 @@ async def create_posts(posts: Union[PostCreate, List[PostCreate]], db: AsyncSess
         # Ensure scheduled_at is UTC
         scheduled_time = post_data.scheduled_at or datetime.now(timezone.utc)
         if scheduled_time.tzinfo is None:
+            # Assume naive time is local if not specified, or just force UTC if that's the contract
+            # User asked to "Convert time from frontend to UTC"
+            # Best practice: Assume naive is UTC if coming from API, but if frontend sends local...
+            # We will force it to UTC.
             scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+        else:
+            # Convert aware time to UTC
+            scheduled_time = scheduled_time.astimezone(timezone.utc)
 
         new_post = SocialPost(
             content=post_data.content,
