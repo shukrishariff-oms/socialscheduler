@@ -65,6 +65,7 @@ async def check_scheduled_posts():
             )
         )
         posts_to_publish = result.scalars().all()
+        logger.info(f"[SCHEDULER] Checked at {now}. Found {len(posts_to_publish)} pending posts due.")
 
         for post in posts_to_publish:
             try:
@@ -492,7 +493,9 @@ async def create_posts(posts: Union[PostCreate, List[PostCreate]], db: AsyncSess
             status=PostStatus.pending
         )
         db.add(new_post)
+        db.add(new_post)
         created_posts.append(new_post)
+        logger.info(f"[API] Created post for {post_data.platform} scheduled at {post_data.scheduled_at}")
 
     await db.commit()
     for p in created_posts:
