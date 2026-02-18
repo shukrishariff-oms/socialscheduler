@@ -5,7 +5,7 @@ Official Meta Threads API integration for posting
 
 import httpx
 import asyncio
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -48,16 +48,16 @@ class ThreadsAPIService:
         """
         try:
             # Step 1: Create media container
-            container_id = await self._create_container(text, media_url, media_type)
+            container_id, error = await self._create_container(text, media_url, media_type)
             
             if not container_id:
-                return {"success": False, "error": "Failed to create media container"}
+                return {"success": False, "error": error or "Failed to create media container"}
             
             # Step 2: Publish the container
-            post_id = await self._publish_container(container_id)
+            post_id, error = await self._publish_container(container_id)
             
             if not post_id:
-                return {"success": False, "error": "Failed to publish post"}
+                return {"success": False, "error": error or "Failed to publish post"}
             
             logger.info(f"[THREADS API] Successfully posted: {post_id}")
             return {"success": True, "post_id": post_id}
@@ -71,12 +71,12 @@ class ThreadsAPIService:
         text: str, 
         media_url: Optional[str],
         media_type: str
-    ) -> Optional[str]:
+    ) -> Tuple[Optional[str], Optional[str]]:
         """
         Create a media container (Step 1 of posting)
         
         Returns:
-            Container ID or None if failed
+            (Container ID, Error Message)
         """
         endpoint = f"{self.BASE_URL}/me/threads"
         
@@ -100,16 +100,17 @@ class ThreadsAPIService:
             container_id = data.get("id")
             
             logger.info(f"[THREADS API] Created container: {container_id}")
-            return container_id
+            return container_id, None
             
         except httpx.HTTPStatusError as e:
-            logger.error(f"[THREADS API] HTTP error creating container: {e.response.status_code} - {e.response.text}")
-            return None
+            error_details = e.response.text
+            logger.error(f"[THREADS API] HTTP error creating container: {e.response.status_code} - {error_details}")
+            return None, f"HTTP {e.response.status_code}: {error_details}"
         except Exception as e:
             logger.error(f"[THREADS API] Error creating container: {e}")
-            return None
+            return None, str(e)
     
-    async def _publish_container(self, container_id: str) -> Optional[str]:
+    async def _publish_container(self, container_id: str) -> Tuple[Optional[str], Optional[str]]:
         """
         Publish a media container (Step 2 of posting)
         
@@ -117,7 +118,7 @@ class ThreadsAPIService:
             container_id: ID from create_container
         
         Returns:
-            Post ID or None if failed
+            (Post ID, Error Message)
         """
         endpoint = f"{self.BASE_URL}/me/threads_publish"
         
@@ -133,14 +134,15 @@ class ThreadsAPIService:
             post_id = data.get("id")
             
             logger.info(f"[THREADS API] Published post: {post_id}")
-            return post_id
+            return post_id, None
             
         except httpx.HTTPStatusError as e:
-            logger.error(f"[THREADS API] HTTP error publishing: {e.response.status_code} - {e.response.text}")
-            return None
+            error_details = e.response.text
+            logger.error(f"[THREADS API] HTTP error publishing: {e.response.status_code} - {error_details}")
+            return None, f"HTTP {e.response.status_code}: {error_details}"
         except Exception as e:
             logger.error(f"[THREADS API] Error publishing: {e}")
-            return None
+            return None, str(e)
     
     async def get_user_profile(self, user_id: str = "me") -> Optional[Dict[str, Any]]:
         """

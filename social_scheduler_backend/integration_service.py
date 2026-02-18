@@ -1,9 +1,14 @@
 import asyncio
 import os
 import httpx
+import logging
 from datetime import datetime
 from dotenv import load_dotenv
 from typing import Optional, Union, Tuple, List
+
+# Configure logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -13,7 +18,7 @@ async def send_to_social(platform: str, content: str, media_url: Optional[str] =
     Sends content to social media platforms.
     Returns: (success, post_id, error_message)
     """
-    print(f"[{platform.upper()}] Preparing to send: {content[:30]}...")
+    logger.info(f"[{platform.upper()}] Preparing to send: {content[:30]}...")
 
     # --- LinkedIn Integration ---
     if platform == 'linkedin':
@@ -22,7 +27,7 @@ async def send_to_social(platform: str, content: str, media_url: Optional[str] =
         
         if not token or not person_urn:
             msg = "Missing credentials. LinkedIN Token or Person URN not set."
-            print(f"[{platform.upper()}] ERROR: {msg}")
+            logger.error(f"[{platform.upper()}] ERROR: {msg}")
             return False, None, msg
 
         url = 'https://api.linkedin.com/v2/ugcPosts'
@@ -54,13 +59,13 @@ async def send_to_social(platform: str, content: str, media_url: Optional[str] =
                 response = await client.post(url, json=payload, headers=headers)
                 if response.status_code in [201, 200]:
                     post_id = response.json().get('id')
-                    print(f"[{platform.upper()}] SUCCESS: Posted to LinkedIn. ID: {post_id}")
+                    logger.info(f"[{platform.upper()}] SUCCESS: Posted to LinkedIn. ID: {post_id}")
                     return True, post_id, None
                 else:
-                    print(f"[{platform.upper()}] FAILED: {response.text}")
+                    logger.error(f"[{platform.upper()}] FAILED: {response.text}")
                     return False, None, response.text
             except Exception as e:
-                print(f"[{platform.upper()}] ERROR: {e}")
+                logger.error(f"[{platform.upper()}] ERROR: {e}")
                 return False, None, str(e)
 
     # --- Threads Integration (Official API with OAuth) ---
@@ -89,24 +94,24 @@ async def send_to_social(platform: str, content: str, media_url: Optional[str] =
                     encryptor = get_encryptor()
                     access_token = encryptor.decrypt(account.access_token)
                     username = account.username
-                    print(f"[{platform.upper()}] Using connected account from DB: @{username}")
+                    logger.info(f"[{platform.upper()}] Using connected account from DB: @{username}")
             except Exception as e:
-                print(f"[{platform.upper()}] Error decrypting DB token: {e}")
+                logger.error(f"[{platform.upper()}] Error decrypting DB token: {e}")
 
         # 2. Fallback to Environment Variable
         if not access_token and os.getenv("THREADS_ACCESS_TOKEN"):
             access_token = os.getenv("THREADS_ACCESS_TOKEN")
             username = os.getenv("THREADS_USERNAME", "env_user")
-            print(f"[{platform.upper()}] Using token from Environment Variables (Fallback) for @{username}")
+            logger.info(f"[{platform.upper()}] Using token from Environment Variables (Fallback) for @{username}")
 
         if not access_token:
             msg = "No access token found (checked Env Var & DB)"
-            print(f"[{platform.upper()}] ERROR: {msg}")
+            logger.error(f"[{platform.upper()}] ERROR: {msg}")
             return False, None, msg
             
         try:
             # Initialize API service
-            print(f"[{platform.upper()}] Using connected account: @{username}")
+            logger.info(f"[{platform.upper()}] Using connected account: @{username}")
             
             # Initialize API service
             api = ThreadsAPIService(access_token)
@@ -121,7 +126,7 @@ async def send_to_social(platform: str, content: str, media_url: Optional[str] =
             
             if result["success"]:
                 post_id = result.get('post_id')
-                print(f"[{platform.upper()}] ✓ Successfully posted! ID: {post_id}")
+                logger.info(f"[{platform.upper()}] ✓ Successfully posted! ID: {post_id}")
                 
                 # Update last_used_at ONLY if account exists in DB
                 if account:
@@ -131,16 +136,16 @@ async def send_to_social(platform: str, content: str, media_url: Optional[str] =
                 return True, post_id, None
             else:
                 error_msg = result.get('error')
-                print(f"[{platform.upper()}] ✗ Failed to post: {error_msg}")
+                logger.error(f"[{platform.upper()}] ✗ Failed to post: {error_msg}")
                 return False, None, error_msg
                 
         except Exception as e:
-            print(f"[{platform.upper()}] ERROR: {e}")
+            logger.error(f"[{platform.upper()}] ERROR: {e}")
             return False, None, str(e)
 
 
     # --- Generic/Mock for Others (Twitter/X, Facebook) ---
     else:
-        print(f"[{platform.upper()}] Simulation Mode (Real API not configured for this demo).")
+        logger.info(f"[{platform.upper()}] Simulation Mode (Real API not configured for this demo).")
         await asyncio.sleep(1)
         return True, "mock_id_123", None
