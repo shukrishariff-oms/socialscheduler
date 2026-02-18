@@ -23,7 +23,11 @@ class ThreadsAPIService:
             access_token: User's Threads access token
         """
         self.access_token = access_token
-        self.client = httpx.AsyncClient(timeout=30.0)
+        # Use Authorization Header for better security and stability
+        headers = {
+            "Authorization": f"Bearer {access_token}"
+        }
+        self.client = httpx.AsyncClient(headers=headers, timeout=30.0)
     
     async def create_post(
         self, 
@@ -78,8 +82,7 @@ class ThreadsAPIService:
         
         payload = {
             "media_type": media_type,
-            "text": text,
-            "access_token": self.access_token
+            "text": text
         }
         
         # Add media URL if provided
@@ -119,8 +122,7 @@ class ThreadsAPIService:
         endpoint = f"{self.BASE_URL}/me/threads_publish"
         
         payload = {
-            "creation_id": container_id,
-            "access_token": self.access_token
+            "creation_id": container_id
         }
         
         try:
