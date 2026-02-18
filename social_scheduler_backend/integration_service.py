@@ -68,28 +68,41 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
         from models import ConnectedAccount
         from datetime import datetime
         
-        # Fetch account from database
-        result = await db.execute(
-            select(ConnectedAccount).where(
-                ConnectedAccount.platform == 'threads',
-                ConnectedAccount.is_active == True
+        access_token = None
+        username = None
+
+        # 1. Try Environment Variable (Priority/Backup)
+        if os.getenv("THREADS_ACCESS_TOKEN"):
+            access_token = os.getenv("THREADS_ACCESS_TOKEN")
+            username = os.getenv("THREADS_USERNAME", "env_user")
+            print(f"[{platform.upper()}] Using token from Environment Variables for @{username}")
+
+        # 2. Try Database (if no env var)
+        if not access_token and db:
+            result = await db.execute(
+                select(ConnectedAccount).where(
+                    ConnectedAccount.platform == 'threads',
+                    ConnectedAccount.is_active == True
+                )
             )
-        )
-        account = result.scalar_one_or_none()
-        
-        if not account:
-            print(f"[{platform.upper()}] ERROR: No connected Threads account found")
-            print(f"[{platform.upper()}] Please connect your Threads account first via the UI")
+            account = result.scalar_one_or_none()
+            
+            if account and account.access_token:
+                try:
+                    encryptor = get_encryptor()
+                    access_token = encryptor.decrypt(account.access_token)
+                    username = account.username
+                    print(f"[{platform.upper()}] Using connected account from DB: @{username}")
+                except Exception as e:
+                    print(f"[{platform.upper()}] Error decrypting DB token: {e}")
+
+        if not access_token:
+            print(f"[{platform.upper()}] ERROR: No access token found (checked Env Var & DB)")
+            print(f"[{platform.upper()}] Please set THREADS_ACCESS_TOKEN in env or connect via UI")
             return False
-        
-        if not account.access_token:
-            print(f"[{platform.upper()}] ERROR: No access token found - please reconnect account")
-            return False
-        
+            
         try:
-            # Decrypt access token
-            encryptor = get_encryptor()
-            access_token = encryptor.decrypt(account.access_token)
+            # Initialize API service
             
             print(f"[{platform.upper()}] Using connected account: @{account.username}")
             
