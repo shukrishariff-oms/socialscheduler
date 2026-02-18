@@ -555,6 +555,27 @@ async def delete_post(post_id: int, db: AsyncSession = Depends(get_db)):
     return {"message": "Post deleted successfully"}
 
 
+@app.post("/posts/{post_id}/retry")
+async def retry_post(post_id: int, db: AsyncSession = Depends(get_db)):
+    """Reset a failed post to 'pending' to retry immediately."""
+    result = await db.execute(select(SocialPost).where(SocialPost.id == post_id))
+    post = result.scalar_one_or_none()
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    post.status = PostStatus.pending
+    post.scheduled_at = datetime.now(timezone.utc)
+    post.external_post_id = None  # Clear previous ID if any
+    post.updated_at = datetime.now(timezone.utc)
+    
+    await db.commit()
+    await db.refresh(post)
+    
+    logger.info(f"[API] Post {post_id} reset to PENDING for retry.")
+    return {"message": "Post queued for retry", "post": post}
+
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok", "message": "Social Media Scheduler API is running"}
