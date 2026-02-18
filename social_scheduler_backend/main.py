@@ -316,6 +316,26 @@ async def threads_callback(
 
 # --- API Endpoints ---
 
+@app.get("/api/debug/threads-config")
+async def debug_threads_config():
+    """Debug endpoint to check Threads configuration (Remove in production)"""
+    app_id = os.getenv("THREADS_APP_ID", "")
+    secret = os.getenv("THREADS_APP_SECRET", "")
+    redirect = os.getenv("THREADS_REDIRECT_URI", "")
+    
+    return {
+        "app_id_present": bool(app_id),
+        "app_id_length": len(app_id),
+        "app_id_preview": f"{app_id[:3]}...{app_id[-3:]}" if len(app_id) > 6 else "Too short",
+        "app_id_has_spaces": " " in app_id,
+        "app_id_is_digit": app_id.strip().isdigit() if app_id else False,
+        "secret_present": bool(secret),
+        "secret_length": len(secret),
+        "redirect_uri": redirect,
+        "redirect_uri_matches_env": redirect == THREADS_REDIRECT_URI
+    }
+
+
 @app.post("/posts", response_model=List[PostResponse])
 async def create_posts(posts: Union[PostCreate, List[PostCreate]], db: AsyncSession = Depends(get_db)):
     """
