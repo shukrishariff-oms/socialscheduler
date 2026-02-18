@@ -211,7 +211,50 @@ async def disconnect_account(platform: str, db: AsyncSession = Depends(get_db)):
 # Threads OAuth Endpoints
 # ============================================================
 
+@app.get("/api/auth/threads/setup", response_class=HTMLResponse)
+async def threads_setup_page():
+    """Simple HTML page to store Threads token directly from browser."""
+    return HTMLResponse(content="""
+    <html>
+    <head><title>Threads Setup</title></head>
+    <body style="font-family:sans-serif;max-width:600px;margin:50px auto;padding:20px">
+        <h2>🔗 Store Threads Access Token</h2>
+        <form id="form">
+            <label>Username:</label><br>
+            <input type="text" id="username" value="shukrishariff.ss" style="width:100%;padding:8px;margin:8px 0"><br>
+            <label>Access Token:</label><br>
+            <textarea id="token" rows="5" style="width:100%;padding:8px;margin:8px 0"></textarea><br>
+            <button type="submit" style="background:#0095f6;color:white;padding:10px 20px;border:none;border-radius:5px;cursor:pointer">Save Token</button>
+        </form>
+        <div id="result" style="margin-top:20px;padding:10px;border-radius:5px"></div>
+        <script>
+            document.getElementById('form').onsubmit = async (e) => {
+                e.preventDefault();
+                const res = await fetch('/api/auth/threads/store-token', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        access_token: document.getElementById('token').value.trim(),
+                        username: document.getElementById('username').value.trim()
+                    })
+                });
+                const data = await res.json();
+                const div = document.getElementById('result');
+                if (data.success) {
+                    div.style.background = '#d4edda';
+                    div.innerHTML = '✅ Token saved! Threads account connected as @' + data.username;
+                } else {
+                    div.style.background = '#f8d7da';
+                    div.innerHTML = '❌ Error: ' + JSON.stringify(data);
+                }
+            };
+        </script>
+    </body>
+    </html>
+    """)
+
 @app.post("/api/auth/threads/store-token")
+
 async def store_threads_token(
     request: dict,
     db: AsyncSession = Depends(get_db)
