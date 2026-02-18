@@ -119,67 +119,9 @@ app.add_middleware(
 # ==================== ACCOUNT CONNECTION ENDPOINTS ====================
 
 from encryption import get_encryptor
-from threads_automation import ThreadsAutomation
 
-@app.post("/api/accounts/connect/threads")
-async def connect_threads_account(
-    request: ConnectAccountRequest,
-    db: AsyncSession = Depends(get_db)
-):
-    """Test login and save Threads credentials"""
-    try:
-        # Test login with Playwright
-        automation = ThreadsAutomation()
-        success = await automation.test_login(request.username, request.password)
-        
-        if not success:
-            return ConnectAccountResponse(
-                success=False,
-                error="Invalid credentials or login failed. Please check your username and password."
-            )
-        
-        # Encrypt password
-        encryptor = get_encryptor()
-        encrypted_pw = encryptor.encrypt(request.password)
-        
-        # Check if account already exists
-        result = await db.execute(
-            select(ConnectedAccount).where(
-                ConnectedAccount.platform == 'threads',
-                ConnectedAccount.username == request.username
-            )
-        )
-        existing = result.scalar_one_or_none()
-        
-        if existing:
-            # Update existing
-            existing.encrypted_password = encrypted_pw
-            existing.is_active = True
-            existing.connected_at = datetime.utcnow()
-        else:
-            # Create new
-            new_account = ConnectedAccount(
-                platform='threads',
-                username=request.username,
-                encrypted_password=encrypted_pw
-            )
-            db.add(new_account)
-        
-        await db.commit()
-        
-        return ConnectAccountResponse(
-            success=True,
-            username=request.username
-        )
-        
-    except Exception as e:
-        print(f"[CONNECT] Error: {e}")
-        import traceback
-        traceback.print_exc()
-        return ConnectAccountResponse(
-            success=False,
-            error=f"Connection error: {str(e)}"
-        )
+# Legacy password-based endpoint removed - now using OAuth via /api/auth/threads/authorize & /callback
+
 
 @app.get("/api/accounts/status")
 async def get_accounts_status(db: AsyncSession = Depends(get_db)):
