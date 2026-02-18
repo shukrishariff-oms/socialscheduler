@@ -3,11 +3,12 @@ import os
 import httpx
 from datetime import datetime
 from dotenv import load_dotenv
+from typing import Optional, Union, Tuple
 
 # Load environment variables
 load_dotenv()
 
-async def send_to_social(platform: str, content: str, media_url: str = None, db=None) -> tuple[bool, str | None, str | None]:
+async def send_to_social(platform: str, content: str, media_url: Optional[str] = None, db=None) -> Tuple[bool, Optional[str], Optional[str]]:
     """
     Sends content to social media platforms.
     Returns: (success, post_id, error_message)
