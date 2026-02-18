@@ -8,6 +8,13 @@ export default function ConnectAccountModal({ platform, onClose, onSuccess }) {
     const [error, setError] = useState('');
 
     const handleConnect = async () => {
+        // For Threads, use OAuth instead of password
+        if (platform === 'threads') {
+            window.location.href = '/api/auth/threads/authorize';
+            return;
+        }
+
+        // For other platforms, use password-based authentication
         if (!username || !password) {
             setError('Please enter both username and password');
             return;
@@ -52,50 +59,67 @@ export default function ConnectAccountModal({ platform, onClose, onSuccess }) {
                     <button className="close-btn" onClick={onClose}>×</button>
                 </div>
 
+
                 <div className="modal-body">
-                    <p className="modal-description">
-                        Enter your {platform} credentials to connect your account.
-                        Your password will be encrypted and stored securely.
-                    </p>
+                    {platform === 'threads' ? (
+                        <>
+                            <p className="modal-description">
+                                Connect your Threads account via Meta's secure OAuth.
+                                You'll be redirected to authenticate with Meta.
+                            </p>
 
-                    <div className="form-group">
-                        <label htmlFor="username">Username</label>
-                        <input
-                            id="username"
-                            type="text"
-                            placeholder="Enter your username"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            onKeyPress={handleKeyPress}
-                            disabled={loading}
-                            autoFocus
-                        />
-                    </div>
+                            <div className="oauth-info">
+                                <span className="info-icon">🔒</span>
+                                <span>We use OAuth 2.0 for secure authentication. Your credentials are never stored.</span>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <p className="modal-description">
+                                Enter your {platform} credentials to connect your account.
+                                Your password will be encrypted and stored securely.
+                            </p>
 
-                    <div className="form-group">
-                        <label htmlFor="password">Password</label>
-                        <input
-                            id="password"
-                            type="password"
-                            placeholder="Enter your password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            onKeyPress={handleKeyPress}
-                            disabled={loading}
-                        />
-                    </div>
+                            <div className="form-group">
+                                <label htmlFor="username">Username</label>
+                                <input
+                                    id="username"
+                                    type="text"
+                                    placeholder="Enter your username"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    disabled={loading}
+                                    autoFocus
+                                />
+                            </div>
 
-                    {error && (
-                        <div className="error-message">
-                            <span className="error-icon">⚠️</span>
-                            {error}
-                        </div>
+                            <div className="form-group">
+                                <label htmlFor="password">Password</label>
+                                <input
+                                    id="password"
+                                    type="password"
+                                    placeholder="Enter your password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    onKeyPress={handleKeyPress}
+                                    disabled={loading}
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="error-message">
+                                    <span className="error-icon">⚠️</span>
+                                    {error}
+                                </div>
+                            )}
+
+                            <div className="modal-info">
+                                <span className="info-icon">ℹ️</span>
+                                <span>This will test your login and save your session for future posts.</span>
+                            </div>
+                        </>
                     )}
-
-                    <div className="modal-info">
-                        <span className="info-icon">ℹ️</span>
-                        <span>This will test your login and save your session for future posts.</span>
-                    </div>
                 </div>
 
                 <div className="modal-footer">
@@ -109,7 +133,7 @@ export default function ConnectAccountModal({ platform, onClose, onSuccess }) {
                     <button
                         className="btn-primary"
                         onClick={handleConnect}
-                        disabled={loading || !username || !password}
+                        disabled={loading || (platform !== 'threads' && (!username || !password))}
                     >
                         {loading ? (
                             <>
@@ -117,7 +141,7 @@ export default function ConnectAccountModal({ platform, onClose, onSuccess }) {
                                 Connecting...
                             </>
                         ) : (
-                            'Connect Account'
+                            platform === 'threads' ? 'Connect with Meta OAuth' : 'Connect Account'
                         )}
                     </button>
                 </div>
