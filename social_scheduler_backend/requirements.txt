@@ -8,5 +8,4 @@ pydantic-settings
 requests
 httpx
 python-dotenv
-playwright
 cryptography

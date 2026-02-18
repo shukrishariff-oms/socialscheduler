@@ -26,8 +26,15 @@ class ConnectedAccount(Base):
     id = Column(Integer, primary_key=True, index=True)
     platform = Column(String(50), nullable=False)  # 'threads', 'linkedin', etc.
     username = Column(String(255), nullable=False)
-    encrypted_password = Column(Text, nullable=False)  # AES encrypted
+    
+    # For password-based auth (legacy)
+    encrypted_password = Column(Text, nullable=True)  # AES encrypted, nullable for OAuth
     session_data = Column(Text, nullable=True)  # JSON: browser cookies/session
+    
+    # For OAuth-based auth (Threads API, LinkedIn, etc.)
+    access_token = Column(Text, nullable=True)  # Encrypted OAuth access token
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)  # Token expiration
+    
     is_active = Column(Boolean, default=True)
     connected_at = Column(DateTime(timezone=True), server_default=func.now())
     last_used_at = Column(DateTime(timezone=True), nullable=True)
@@ -35,3 +42,4 @@ class ConnectedAccount(Base):
     __table_args__ = (
         UniqueConstraint('platform', 'username', name='unique_platform_username'),
     )
+

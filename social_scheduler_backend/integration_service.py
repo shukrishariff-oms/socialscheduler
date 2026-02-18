@@ -60,14 +60,15 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
                 print(f"[{platform.upper()}] ERROR: {e}")
                 return False
 
-    # --- Threads Integration (Browser Automation with DB Credentials) ---
+    # --- Threads Integration (Official API with OAuth) ---
     elif platform == 'threads':
-        from threads_automation import ThreadsAutomation
+        from threads_api_service import ThreadsAPIService
         from encryption import get_encryptor
         from sqlalchemy import select
         from models import ConnectedAccount
+        from datetime import datetime
         
-        # Fetch credentials from database
+        # Fetch account from database
         result = await db.execute(
             select(ConnectedAccount).where(
                 ConnectedAccount.platform == 'threads',
@@ -81,33 +82,40 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
             print(f"[{platform.upper()}] Please connect your Threads account first via the UI")
             return False
         
+        if not account.access_token:
+            print(f"[{platform.upper()}] ERROR: No access token found - please reconnect account")
+            return False
+        
         try:
-            # Decrypt credentials
+            # Decrypt access token
             encryptor = get_encryptor()
-            username = account.username
-            password = encryptor.decrypt(account.encrypted_password)
+            access_token = encryptor.decrypt(account.access_token)
             
-            print(f"[{platform.upper()}] Using connected account: @{username}")
+            print(f"[{platform.upper()}] Using connected account: @{account.username}")
             
-            # Use automation
-            automation = ThreadsAutomation()
-            success = await automation.post_to_threads(username, password, content, media_url)
+            # Initialize API service
+            api = ThreadsAPIService(access_token)
             
-            if success:
+            # Determine media type
+            media_type = "TEXT"
+            if media_url:
+                media_type = "IMAGE"  # Could add logic for VIDEO detection
+            
+            # Create post via API
+            result = await api.create_post(content, media_url, media_type)
+            
+            if result["success"]:
+                print(f"[{platform.upper()}] ✓ Successfully posted! ID: {result.get('post_id')}")
                 # Update last_used_at
-                from datetime import datetime
                 account.last_used_at = datetime.utcnow()
                 await db.commit()
-                print(f"[{platform.upper()}] SUCCESS: Posted via browser automation")
+                return True
             else:
-                print(f"[{platform.upper()}] FAILED: Browser automation failed")
-            
-            return success
-            
+                print(f"[{platform.upper()}] ✗ Failed to post: {result.get('error')}")
+                return False
+                
         except Exception as e:
             print(f"[{platform.upper()}] ERROR: {e}")
-            import traceback
-            traceback.print_exc()
             return False
 
 

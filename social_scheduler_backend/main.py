@@ -238,6 +238,128 @@ async def disconnect_account(
             error=str(e)
         )
 
+
+# --- Threads OAuth Endpoints ---
+
+import httpx
+from fastapi.responses import RedirectResponse, HTMLResponse
+from datetime import timedelta
+
+# Environment variables for Threads OAuth
+THREADS_APP_ID = os.getenv("THREADS_APP_ID", "")
+THREADS_APP_SECRET = os.getenv("THREADS_APP_SECRET", "")
+THREADS_REDIRECT_URI = os.getenv("THREADS_REDIRECT_URI", "http://localhost:8000/api/auth/threads/callback")
+
+@app.get("/api/auth/threads/authorize")
+async def threads_authorize():
+    """Redirect user to Threads OAuth authorization page"""
+    if not THREADS_APP_ID:
+        raise HTTPException(status_code=500, detail="Threads App ID not configured")
+    
+    auth_url = (
+        f"https://threads.net/oauth/authorize"
+        f"?client_id={THREADS_APP_ID}"
+        f"&redirect_uri={THREADS_REDIRECT_URI}"
+        f"&scope=threads_basic,threads_content_publish"
+        f"&response_type=code"
+    )
+    
+    logger.info(f"[THREADS OAUTH] Redirecting to authorization")
+    return RedirectResponse(auth_url)
+
+@app.get("/api/auth/threads/callback")
+async def threads_callback(
+    code: str = None,
+    error: str = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle OAuth callback from Threads"""
+    if error:
+        logger.error(f"[THREADS OAUTH] Authorization error: {error}")
+        return HTMLResponse(
+            content=f"<html><body><h2>Connection Failed</h2><p>Error: {error}</p><script>setTimeout(() => window.close(), 3000);</script></body></html>",
+            status_code=400
+        )
+    
+    if not code:
+        raise HTTPException(status_code=400, detail="No authorization code provided")
+    
+    try:
+        # Exchange code for access token
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://graph.threads.net/oauth/access_token",
+                data={
+                    "client_id": THREADS_APP_ID,
+                    "client_secret": THREADS_APP_SECRET,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": THREADS_REDIRECT_URI,
+                    "code": code
+                }
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"[THREADS OAUTH] Token exchange failed: {response.text}")
+                raise HTTPException(status_code=400, detail="Failed to exchange authorization code")
+            
+            token_data = response.json()
+            access_token = token_data.get("access_token")
+            user_id = token_data.get("user_id")
+            expires_in = token_data.get("expires_in", 3600)
+            
+            # Get user profile
+            profile_response = await client.get(
+                f"https://graph.threads.net/v1.0/{user_id}",
+                params={"fields": "id,username", "access_token": access_token}
+            )
+            
+            username = f"user_{user_id}"
+            if profile_response.status_code == 200:
+                username = profile_response.json().get("username", username)
+            
+            logger.info(f"[THREADS OAUTH] Authenticated: @{username}")
+            
+            # Encrypt and save token
+            from encryption import get_encryptor
+            encryptor = get_encryptor()
+            encrypted_token = encryptor.encrypt(access_token)
+            token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+            
+            # Save to database
+            result = await db.execute(
+                select(ConnectedAccount).where(
+                    ConnectedAccount.platform == 'threads',
+                    ConnectedAccount.username == username
+                )
+            )
+            existing = result.scalar_one_or_none()
+            
+            if existing:
+                existing.access_token = encrypted_token
+                existing.token_expires_at = token_expires_at
+                existing.is_active = True
+            else:
+                new_account = ConnectedAccount(
+                    platform='threads',
+                    username=username,
+                    access_token=encrypted_token,
+                    token_expires_at=token_expires_at
+                )
+                db.add(new_account)
+            
+            await db.commit()
+            
+            return HTMLResponse(
+                content=f"""<html><head><style>body{{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#667eea,#764ba2);color:white;}}.container{{text-align:center;padding:2rem;background:rgba(255,255,255,0.1);border-radius:20px;}}</style></head><body><div class="container"><div style="font-size:64px;margin-bottom:1rem;">✓</div><h2>Connected!</h2><p>@{username}</p></div><script>if(window.opener){{window.opener.postMessage({{type:'threads_connected',username:'{username}'}},'*');}}setTimeout(()=>window.close(),2000);</script></body></html>"""
+            )
+            
+    except Exception as e:
+        logger.error(f"[THREADS OAUTH] Error: {str(e)}")
+        return HTMLResponse(
+            content=f"<html><body><h2>Connection Failed</h2><p>{str(e)}</p><script>setTimeout(()=>window.close(),3000);</script></body></html>",
+            status_code=500
+        )
+
 # --- API Endpoints ---
 
 @app.post("/posts", response_model=List[PostResponse])
