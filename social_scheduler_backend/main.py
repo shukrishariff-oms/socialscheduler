@@ -101,6 +101,41 @@ async def lifespan(app: FastAPI):
     logger.info(f"[THREADS] Redirect URI: {THREADS_REDIRECT_URI}")
     logger.info("--- END CHECK ---")
 
+    # Sync Env Var Token to Database (Fix for Frontend UI)
+    try:
+        if THREADS_ACCESS_TOKEN := os.getenv("THREADS_ACCESS_TOKEN"):
+             # Create a new session for this startup task
+            async with AsyncSession(engine) as session:
+                async with session.begin():
+                    # Check if account exists
+                    result = await session.execute(
+                        select(ConnectedAccount).where(
+                            ConnectedAccount.platform == 'threads'
+                        )
+                    )
+                    existing = result.scalar_one_or_none()
+                    
+                    if not existing:
+                        logger.info("[STARTUP] Syncing Threads Token from Env Var to Database...")
+                        # Encrypt token
+                        encryptor = get_encryptor()
+                        encrypted_token = encryptor.encrypt(THREADS_ACCESS_TOKEN)
+                        
+                        # Insert
+                        new_account = ConnectedAccount(
+                            platform='threads',
+                            username=os.getenv("THREADS_USERNAME", "shukrishariff.ss"),
+                            access_token=encrypted_token,
+                            is_active=True,
+                            token_expires_at=datetime.now(timezone.utc) + timedelta(days=60)
+                        )
+                        session.add(new_account)
+                        logger.info("[STARTUP] Threads account synced to DB successfully!")
+                    else:
+                        logger.info("[STARTUP] Threads account already exists in DB. Skipping sync.")
+    except Exception as e:
+        logger.error(f"[STARTUP] Error syncing Env Var token to DB: {e}")
+
     # Start scheduler
     try:
         scheduler.add_job(
