@@ -193,21 +193,32 @@ THREADS_APP_ID = os.getenv("THREADS_APP_ID", "")
 THREADS_APP_SECRET = os.getenv("THREADS_APP_SECRET", "")
 THREADS_REDIRECT_URI = os.getenv("THREADS_REDIRECT_URI", "http://localhost:8000/api/auth/threads/callback")
 
+import urllib.parse
+
 @app.get("/api/auth/threads/authorize")
 async def threads_authorize():
     """Redirect user to Threads OAuth authorization page"""
-    if not THREADS_APP_ID:
+    app_id = THREADS_APP_ID.strip()
+    redirect_uri = THREADS_REDIRECT_URI.strip()
+    
+    if not app_id:
         raise HTTPException(status_code=500, detail="Threads App ID not configured")
     
-    auth_url = (
-        f"https://threads.net/oauth/authorize"
-        f"?client_id={THREADS_APP_ID}"
-        f"&redirect_uri={THREADS_REDIRECT_URI}"
-        f"&scope=threads_basic,threads_content_publish"
-        f"&response_type=code"
-    )
+    # URL encode params
+    params = {
+        "client_id": app_id,
+        "redirect_uri": redirect_uri,
+        "scope": "threads_basic,threads_content_publish",
+        "response_type": "code"
+    }
+    encoded_params = urllib.parse.urlencode(params)
     
-    logger.info(f"[THREADS OAUTH] Redirecting to authorization")
+    auth_url = f"https://www.threads.net/oauth/authorize?{encoded_params}"
+    
+    logger.info(f"[THREADS OAUTH] App ID: {app_id}")
+    logger.info(f"[THREADS OAUTH] Redirect URI: {redirect_uri}")
+    logger.info(f"[THREADS OAUTH] Generated URL: {auth_url}")
+    
     return RedirectResponse(auth_url)
 
 @app.get("/api/auth/threads/callback")
