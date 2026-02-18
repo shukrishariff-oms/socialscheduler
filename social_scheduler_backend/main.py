@@ -77,18 +77,23 @@ async def check_scheduled_posts():
             for post in posts_to_publish:
                 try:
                     # Pass session to allow token retrieval from DB
-                    success = await send_to_social(post.platform, post.content, post.media_url, db=session)
+                    success, post_id, error_msg = await send_to_social(post.platform, post.content, post.media_url, db=session)
                     
-                    post.status = PostStatus.published if success else PostStatus.failed
+                    if success:
+                        post.status = PostStatus.published
+                        post.external_post_id = post_id
+                        logger.info(f"[SCHEDULER] Post {post.id} -> PUBLISHED. ID: {post_id}")
+                    else:
+                        post.status = PostStatus.failed
+                        logger.error(f"[SCHEDULER] Post {post.id} -> FAILED. Error: {error_msg}")
+
                     post.updated_at = datetime.now(timezone.utc)
                     
-                    logger.info(f"[SCHEDULER] Post {post.id} -> {'published' if success else 'failed'}")
                 except Exception as e:
                     logger.error(f"[SCHEDULER] Error publishing post {post.id}: {e}")
                     post.status = PostStatus.failed
-            
-            # Commit processing changes
-            if posts_to_publish:
+                
+                # Commit processing changes per post to minimize rollback impact
                 await session.commit()
             
         except Exception as e:

@@ -7,10 +7,10 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-async def send_to_social(platform: str, content: str, media_url: str = None, db=None) -> bool:
+async def send_to_social(platform: str, content: str, media_url: str = None, db=None) -> tuple[bool, str | None, str | None]:
     """
-    Sends content to social media platforms using real APIs.
-    Falls back to mock mode if tokens are missing.
+    Sends content to social media platforms.
+    Returns: (success, post_id, error_message)
     """
     print(f"[{platform.upper()}] Preparing to send: {content[:30]}...")
 
@@ -20,8 +20,9 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
         person_urn = os.getenv('LINKEDIN_PERSON_URN')
         
         if not token or not person_urn:
-            print(f"[{platform.upper()}] ERROR: Missing credentials. LinkedIN Token or Person URN not set.")
-            return False
+            msg = "Missing credentials. LinkedIN Token or Person URN not set."
+            print(f"[{platform.upper()}] ERROR: {msg}")
+            return False, None, msg
 
         url = 'https://api.linkedin.com/v2/ugcPosts'
         headers = {
@@ -51,14 +52,15 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
             try:
                 response = await client.post(url, json=payload, headers=headers)
                 if response.status_code in [201, 200]:
-                    print(f"[{platform.upper()}] SUCCESS: Posted to LinkedIn. ID: {response.json().get('id')}")
-                    return True
+                    post_id = response.json().get('id')
+                    print(f"[{platform.upper()}] SUCCESS: Posted to LinkedIn. ID: {post_id}")
+                    return True, post_id, None
                 else:
                     print(f"[{platform.upper()}] FAILED: {response.text}")
-                    return False
+                    return False, None, response.text
             except Exception as e:
                 print(f"[{platform.upper()}] ERROR: {e}")
-                return False
+                return False, None, str(e)
 
     # --- Threads Integration (Official API with OAuth) ---
     elif platform == 'threads':
@@ -97,13 +99,12 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
                     print(f"[{platform.upper()}] Error decrypting DB token: {e}")
 
         if not access_token:
-            print(f"[{platform.upper()}] ERROR: No access token found (checked Env Var & DB)")
-            print(f"[{platform.upper()}] Please set THREADS_ACCESS_TOKEN in env or connect via UI")
-            return False
+            msg = "No access token found (checked Env Var & DB)"
+            print(f"[{platform.upper()}] ERROR: {msg}")
+            return False, None, msg
             
         try:
             # Initialize API service
-            
             print(f"[{platform.upper()}] Using connected account: @{username}")
             
             # Initialize API service
@@ -118,25 +119,27 @@ async def send_to_social(platform: str, content: str, media_url: str = None, db=
             result = await api.create_post(content, media_url, media_type)
             
             if result["success"]:
-                print(f"[{platform.upper()}] ✓ Successfully posted! ID: {result.get('post_id')}")
+                post_id = result.get('post_id')
+                print(f"[{platform.upper()}] ✓ Successfully posted! ID: {post_id}")
                 
                 # Update last_used_at ONLY if account exists in DB
                 if account:
                     account.last_used_at = datetime.utcnow()
                     await db.commit()
                 
-                return True
+                return True, post_id, None
             else:
-                print(f"[{platform.upper()}] ✗ Failed to post: {result.get('error')}")
-                return False
+                error_msg = result.get('error')
+                print(f"[{platform.upper()}] ✗ Failed to post: {error_msg}")
+                return False, None, error_msg
                 
         except Exception as e:
             print(f"[{platform.upper()}] ERROR: {e}")
-            return False
+            return False, None, str(e)
 
 
     # --- Generic/Mock for Others (Twitter/X, Facebook) ---
     else:
         print(f"[{platform.upper()}] Simulation Mode (Real API not configured for this demo).")
         await asyncio.sleep(1)
-        return True
+        return True, "mock_id_123", None

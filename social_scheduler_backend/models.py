@@ -17,6 +17,7 @@ class SocialPost(Base):
     scheduled_at = Column(DateTime(timezone=True), nullable=False)
     platform = Column(String, nullable=False)
     status = Column(String, default=PostStatus.pending.value)
+    external_post_id = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

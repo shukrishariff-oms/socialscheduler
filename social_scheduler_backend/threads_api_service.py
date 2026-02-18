@@ -27,7 +27,7 @@ class ThreadsAPIService:
         headers = {
             "Authorization": f"Bearer {access_token}"
         }
-        self.client = httpx.AsyncClient(headers=headers, timeout=30.0)
+        self.client = httpx.AsyncClient(headers=headers, timeout=60.0)
     
     async def create_post(
         self, 
