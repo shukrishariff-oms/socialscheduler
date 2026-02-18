@@ -31,6 +31,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy semua kod backend
 COPY social_scheduler_backend/ .
 
+# Fix permissions for SQLite
+RUN chmod -R 777 /app
+
 # Copy built frontend dari Stage 1 ke folder static
 COPY --from=frontend-builder /app/frontend/dist /app/static
 
