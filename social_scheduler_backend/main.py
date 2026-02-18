@@ -85,9 +85,14 @@ scheduler = AsyncIOScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create DB tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        # Create DB tables
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("[STARTUP] Database tables created/verified.")
+    except Exception as e:
+        logger.error(f"[STARTUP] CRITICAL: Database init failed: {e}")
+        raise
 
     # Log Threads config on startup
     logger.info("--- STARTUP CONFIG CHECK ---")
@@ -97,14 +102,18 @@ async def lifespan(app: FastAPI):
     logger.info("--- END CHECK ---")
 
     # Start scheduler
-    scheduler.add_job(
-        check_scheduled_posts,
-        IntervalTrigger(seconds=10),
-        id="check_posts",
-        replace_existing=True,
-    )
-    scheduler.start()
-    logger.info("[SCHEDULER] Started.")
+    try:
+        scheduler.add_job(
+            check_scheduled_posts,
+            IntervalTrigger(seconds=10),
+            id="check_posts",
+            replace_existing=True,
+        )
+        scheduler.start()
+        logger.info("[SCHEDULER] Started.")
+    except Exception as e:
+        logger.error(f"[STARTUP] CRITICAL: Scheduler failed to start: {e}")
+        raise
 
     yield
 
